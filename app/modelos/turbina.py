@@ -14,4 +14,5 @@ class Turbina(Base):
 
     parque         = relationship("Parque",  back_populates="turbinas")
     inspecciones   = relationship("InspeccionRodamiento", back_populates="turbina")
-    warnings       = relationship("WarningRodamiento",    back_populates="turbina")
+    warnings_por_mes  = relationship("WarningPorMes",  back_populates="turbina")
+    warnings_por_tipo = relationship("WarningPorTipo", back_populates="turbina")

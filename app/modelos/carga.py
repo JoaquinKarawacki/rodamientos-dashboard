@@ -23,4 +23,5 @@ class Carga(Base):
 
     parque       = relationship("Parque", back_populates="cargas")
     inspecciones = relationship("InspeccionRodamiento", back_populates="carga")
-    warnings     = relationship("WarningRodamiento",    back_populates="carga")
+    warnings_por_mes  = relationship("WarningPorMes",  back_populates="carga")
+    warnings_por_tipo = relationship("WarningPorTipo", back_populates="carga")
