@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: seg
+      POSTGRES_PASSWORD: seg123
+      POSTGRES_DB: rodamientos
+    ports:
+      - "5432:5432"
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+
+volumes:
+  datos_postgres:
