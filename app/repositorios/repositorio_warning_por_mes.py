@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from app.modelos.turbina import Turbina
 from app.modelos.warning_por_mes import WarningPorMes
 
 
@@ -40,4 +41,37 @@ class RepositorioWarningPorMes:
             self.sesion.query(WarningPorMes)
             .filter_by(carga_id=carga_id)
             .delete()
+        )
+    
+    def obtener_totales_por_mes(self, parque_id: int) -> list:
+        from sqlalchemy import func
+        from app.modelos.turbina import Turbina
+        return (
+            self.sesion.query(
+                WarningPorMes.mes,
+                WarningPorMes.anio,
+                func.sum(WarningPorMes.cantidad).label("total")
+            )
+            .join(Turbina)
+            .filter(Turbina.parque_id == parque_id)
+            .group_by(WarningPorMes.anio, WarningPorMes.mes)
+            .order_by(WarningPorMes.anio, WarningPorMes.mes)
+            .all()
+        )
+    
+    def obtener_por_turbina(self, turbina_id: int) -> list[WarningPorMes]:
+        return (
+            self.sesion.query(WarningPorMes)
+            .filter_by(turbina_id=turbina_id)
+            .order_by(WarningPorMes.anio, WarningPorMes.mes)
+            .all()
+        )
+    
+    def obtener_todas_por_parque(self, parque_id: int) -> list[WarningPorMes]:
+        return (
+            self.sesion.query(WarningPorMes)
+            .join(Turbina)
+            .filter(Turbina.parque_id == parque_id)
+            .order_by(WarningPorMes.anio, WarningPorMes.mes)
+            .all()
         )

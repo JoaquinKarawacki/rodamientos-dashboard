@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rodamientos — SEG Ingeniería</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1017;
+      --surface:   #161b27;
+      --surface-2: #1d2336;
+      --border:    #272f45;
+      --text:      #dde3f0;
+      --muted:     #7b869c;
+      --accent:    #38bdf8;
+
+      --cat-a:  #22c55e;
+      --cat-b:  #eab308;
+      --cat-c:  #f97316;
+      --cat-d:  #ef4444;
+      --cat-nd: #6b7280;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────── */
+    .header {
+      flex-shrink: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-logo {
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .header-logo svg { display: block; }
+
+    .header-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .header-title span { color: var(--muted); font-weight: 400; }
+
+    .park-selector {
+      display: flex;
+      gap: 4px;
+      background: var(--surface-2);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .park-btn {
+      padding: 5px 16px;
+      border-radius: 5px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .park-btn.active {
+      background: var(--accent);
+      color: #0d1017;
+    }
+
+    .park-btn:hover:not(.active) { color: var(--text); }
+
+    /* ── TABS NAV ────────────────────────────────────────────── */
+    .tabs-nav {
+      flex-shrink: 0;
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      background: var(--surface);
+    }
+
+    .tab-btn {
+      padding: 13px 18px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.15s;
+    }
+
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    /* ── TAB PANELS ─────────────────────────────────────────── */
+    .tab-panels {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .tab-panel {
+      display: none;
+      height: 100%;
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+
+    .tab-panel.active { display: block; }
+
+    #tab-turbina {
+      overflow: hidden;
+      padding: 16px;
+    }
+
+    /* ── UTILITIES ──────────────────────────────────────────── */
+    .section-label {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .loading {
+      padding: 48px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .empty {
+      padding: 48px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .cat-a { color: var(--cat-a); }
+    .cat-b { color: var(--cat-b); }
+    .cat-c { color: var(--cat-c); }
+    .cat-d { color: var(--cat-d); }
+    .cat-nd { color: var(--cat-nd); }
+
+    /* ── COUNTER CARDS ──────────────────────────────────────── */
+    .counters-row {
+      margin-bottom: 20px;
+    }
+
+    .counters-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .counter-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      flex: 1;
+      min-width: 80px;
+      border-left-width: 3px;
+    }
+
+    .counter-card .count {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .counter-card .label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .counter-card.cc-a { border-left-color: var(--cat-a); }
+    .counter-card.cc-b { border-left-color: var(--cat-b); }
+    .counter-card.cc-c { border-left-color: var(--cat-c); }
+    .counter-card.cc-d { border-left-color: var(--cat-d); }
+
+    /* ── CHART BOX ──────────────────────────────────────────── */
+    .chart-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .chart-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    /* ── MAPA ESTADO ────────────────────────────────────────── */
+    .turbinas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+    }
+
+    .turbina-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .turbina-card:hover {
+      border-color: var(--accent);
+      background: var(--surface-2);
+    }
+
+    .turbina-card .t-code {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    .t-badges {
+      display: flex;
+      gap: 6px;
+    }
+
+    .t-badge {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .t-dot {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .t-dot.da { background: rgba(34,197,94,.15); color: var(--cat-a); border: 1px solid rgba(34,197,94,.3); }
+    .t-dot.db { background: rgba(234,179,8,.15); color: var(--cat-b); border: 1px solid rgba(234,179,8,.3); }
+    .t-dot.dc { background: rgba(249,115,22,.15); color: var(--cat-c); border: 1px solid rgba(249,115,22,.3); }
+    .t-dot.dd { background: rgba(239,68,68,.15); color: var(--cat-d); border: 1px solid rgba(239,68,68,.3); }
+    .t-dot.dnd { background: rgba(107,114,128,.15); color: var(--cat-nd); border: 1px solid rgba(107,114,128,.3); }
+
+    .t-dot-label {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    /* ── POR TURBINA ────────────────────────────────────────── */
+    .turbina-layout {
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      gap: 14px;
+      height: 100%;
+    }
+
+    .turbina-sidebar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow-y: auto;
+    }
+
+    .sidebar-item {
+      padding: 9px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      transition: background 0.1s;
+      border-left: 3px solid transparent;
+    }
+
+    .sidebar-item:last-child { border-bottom: none; }
+    .sidebar-item:hover { background: var(--surface-2); }
+    .sidebar-item.active {
+      background: var(--surface-2);
+      border-left-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .sidebar-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: 'Space Grotesk', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .turbina-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+    }
+
+    /* status header */
+    .t-status-header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .t-status-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .t-status-badge {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .t-status-badge strong {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .t-status-date {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* inspection table */
+    .insp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .insp-table th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .insp-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .insp-table tr:last-child td { border-bottom: none; }
+
+    .insp-table tr:hover td { background: var(--surface-2); }
+
+    /* ── ADMIN ──────────────────────────────────────────────── */
+    .admin-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 16px;
+      max-width: 1100px;
+    }
+
+    .admin-form {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-select, .form-file {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      padding: 8px 10px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .form-select:focus, .form-file:focus {
+      border-color: var(--accent);
+    }
+
+    .form-file {
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .form-file::file-selector-button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      padding: 4px 10px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0d1017;
+      border: none;
+      border-radius: 6px;
+      padding: 9px 16px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      width: 100%;
+    }
+
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .form-feedback {
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      display: none;
+    }
+
+    .form-feedback.ok {
+      display: block;
+      background: rgba(34,197,94,.1);
+      border: 1px solid rgba(34,197,94,.3);
+      color: var(--cat-a);
+    }
+
+    .form-feedback.err {
+      display: block;
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.3);
+      color: var(--cat-d);
+    }
+
+    .cargas-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .cargas-table th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .cargas-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .cargas-table tr:last-child td { border-bottom: none; }
+    .cargas-table tr:hover td { background: var(--surface-2); }
+
+    .estado-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .estado-exitosa  { background: rgba(34,197,94,.1);  color: var(--cat-a); border: 1px solid rgba(34,197,94,.25); }
+    .estado-revertida{ background: rgba(107,114,128,.1); color: var(--muted); border: 1px solid rgba(107,114,128,.25); }
+    .estado-fallida  { background: rgba(239,68,68,.1);  color: var(--cat-d); border: 1px solid rgba(239,68,68,.25); }
+
+    .btn-revertir {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.15s;
+    }
+
+    .btn-revertir:hover {
+      border-color: var(--cat-d);
+      color: var(--cat-d);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="header-logo">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="2" fill="#0d1017"/>
+          <path d="M8 2 L9 6 L7 6 Z" fill="#0d1017"/>
+          <path d="M13.5 11 L10 8.5 L11 6.7 Z" fill="#0d1017"/>
+          <path d="M2.5 11 L6 8.5 L5 6.7 Z" fill="#0d1017"/>
+        </svg>
+      </div>
+      <div class="header-title">SEG Ingeniería <span>/</span> Rodamientos</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="park-selector" id="parkSelector"></div>
+      <a id="btn-exportar" href="#" target="_blank"
+         style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;text-decoration:none;transition:all 0.15s"
+         onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+         onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M7 2v7M4 6l3 3 3-3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1"/>
+        </svg>
+        Exportar HTML
+      </a>
+    </div>
+  </header>
+
+  <!-- TABS -->
+  <nav class="tabs-nav">
+    <button class="tab-btn active" data-tab="resumen">Resumen</button>
+    <button class="tab-btn" data-tab="mapa">Mapa Estado</button>
+    <button class="tab-btn" data-tab="turbina">Por Turbina</button>
+    <button class="tab-btn" data-tab="admin">Administración</button>
+  </nav>
+
+  <!-- TAB PANELS -->
+  <div class="tab-panels">
+
+    <div id="tab-resumen" class="tab-panel active">
+      <div id="resumen-content"><div class="loading">Cargando...</div></div>
+    </div>
+
+    <div id="tab-mapa" class="tab-panel">
+      <div id="mapa-content"><div class="loading">Cargando...</div></div>
+    </div>
+
+    <div id="tab-turbina" class="tab-panel">
+      <div class="turbina-layout">
+        <div class="turbina-sidebar" id="turbina-sidebar">
+          <div class="loading">Cargando...</div>
+        </div>
+        <div class="turbina-detail" id="turbina-detail">
+          <div class="empty">Seleccioná una turbina para ver el detalle.</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-admin" class="tab-panel">
+      <div class="admin-layout">
+
+        <div class="admin-form">
+          <div class="section-label">Cargar archivo</div>
+
+          <div class="form-group">
+            <label class="form-label">Parque</label>
+            <select id="admin-parque" class="form-select"></select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Tipo de carga</label>
+            <select id="admin-tipo" class="form-select" onchange="onTipoCambio()">
+              <option value="control_mensual">Control mensual (hoja X)</option>
+              <option value="logbook">Logbook ROTORsoft</option>
+              <option value="seed_rodamientos">Seed rodamientos (primera vez)</option>
+              <option value="seed_warnings">Seed warnings Peralta (primera vez)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Archivo Excel</label>
+            <input type="file" id="admin-archivo" class="form-file" accept=".xlsx,.xls">
+          </div>
+
+          <button class="btn-primary" id="admin-submit" onclick="subirArchivo()">Cargar</button>
+          <div class="form-feedback" id="admin-feedback"></div>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-title">Historial de cargas</div>
+          <div id="admin-cargas"><div class="loading">Cargando...</div></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API = 'http://localhost:8000';
+
+    const MESES = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+    const CAT_COLORS = {
+      A: '#22c55e', B: '#eab308', C: '#f97316', D: '#ef4444', ND: '#6b7280'
+    };
+
+    const TYPE_COLORS = ['#38bdf8','#818cf8','#f472b6','#34d399','#fb923c','#a78bfa','#fbbf24'];
+
+    let parques = [];
+    let parqueActual = null;
+    let turbinaActivaId = null;
+    let turbinaActivaCodigo = null;
+
+    // ── PLOTLY CONFIG ──────────────────────────────────────────
+
+    function plotlyLayout(extra = {}) {
+      return {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { color: '#dde3f0', family: 'Inter, sans-serif', size: 11 },
+        xaxis: { gridcolor: '#272f45', color: '#7b869c', linecolor: '#272f45', tickfont: { size: 11 } },
+        yaxis: { gridcolor: '#272f45', color: '#7b869c', linecolor: '#272f45', zeroline: false, tickfont: { size: 11 } },
+        margin: { t: 8, r: 12, b: 44, l: 40 },
+        legend: { bgcolor: 'transparent', bordercolor: 'transparent', font: { size: 11 } },
+        ...extra
+      };
+    }
+
+    const plotlyConfig = { responsive: true, displayModeBar: false };
+
+    // ── HELPERS ───────────────────────────────────────────────
+
+    function dotClass(cat) {
+      const c = (cat || 'ND').toUpperCase();
+      return { A: 'da', B: 'db', C: 'dc', D: 'dd' }[c] || 'dnd';
+    }
+
+    function catClass(cat) {
+      return 'cat-' + (cat || 'nd').toLowerCase();
+    }
+
+    function worstCat(a, b) {
+      const order = { D: 4, C: 3, B: 2, A: 1, ND: 0 };
+      return (order[a] || 0) >= (order[b] || 0) ? a : b;
+    }
+
+    function mesLabel(mes, anio) {
+      return `${MESES[mes]} ${anio}`;
+    }
+
+    // ── INIT ──────────────────────────────────────────────────
+
+    async function init() {
+      try {
+        const res = await fetch(`${API}/parques/`);
+        parques = await res.json();
+
+        const sel = document.getElementById('parkSelector');
+        parques.forEach((p, i) => {
+          const btn = document.createElement('button');
+          btn.className = 'park-btn' + (i === 0 ? ' active' : '');
+          btn.textContent = p.nombre;
+          btn.dataset.codigo = p.codigo;
+          btn.addEventListener('click', () => selectParque(p));
+          sel.appendChild(btn);
+        });
+
+        selectParque(parques[0]);
+      } catch (e) {
+        document.getElementById('resumen-content').innerHTML =
+          `<div class="empty">No se pudo conectar a la API. ¿Está corriendo uvicorn?</div>`;
+      }
+    }
+
+    function selectParque(parque) {
+      parqueActual = parque;
+      document.querySelectorAll('.park-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.codigo === parque.codigo)
+      );
+      document.getElementById('btn-exportar').href = `${API}/exportar/${parque.codigo}`;
+      loadCurrentTab();
+    }
+
+    // ── TABS ──────────────────────────────────────────────────
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        loadCurrentTab();
+      });
+    });
+
+    function getActiveTab() {
+      return document.querySelector('.tab-btn.active')?.dataset.tab;
+    }
+
+    function loadCurrentTab() {
+      const tab = getActiveTab();
+      if (tab === 'resumen') loadResumen();
+      else if (tab === 'mapa') loadMapa();
+      else if (tab === 'turbina') loadTurbinasSidebar();
+      else if (tab === 'admin') loadAdmin();
+    }
+
+    // ── RESUMEN ───────────────────────────────────────────────
+
+    async function loadResumen() {
+      const el = document.getElementById('resumen-content');
+      el.innerHTML = '<div class="loading">Cargando...</div>';
+
+      const res = await fetch(`${API}/resumen/${parqueActual.codigo}`);
+      const data = await res.json();
+      const { contadores, warnings_por_tipo, warnings_por_mes } = data;
+
+      function renderCounterGroup(obj, titulo) {
+        const cats = ['A','B','C','D'];
+        return `
+          <div class="counters-row">
+            <div class="section-label">${titulo}</div>
+            <div class="counters-group">
+              ${cats.map(c => `
+                <div class="counter-card cc-${c.toLowerCase()}">
+                  <div class="count cat-${c.toLowerCase()}">${obj[c] || 0}</div>
+                  <div class="label">Cat. ${c}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      el.innerHTML = `
+        ${renderCounterGroup(contadores.delantera, 'Rodamiento Delantero')}
+        ${renderCounterGroup(contadores.trasera, 'Rodamiento Trasero')}
+        <div class="charts-row" style="margin-top:8px">
+          <div class="chart-box">
+            <div class="chart-title">Warnings por mes</div>
+            <div id="chart-mes" style="height:200px"></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">Warnings por tipo</div>
+            <div id="chart-tipo" style="height:200px"></div>
+          </div>
+        </div>
+      `;
+
+      // Warnings por mes
+      if (warnings_por_mes.length > 0) {
+        const labels = warnings_por_mes.map(w => mesLabel(w.mes, w.anio));
+        const totales = warnings_por_mes.map(w => w.total);
+        Plotly.newPlot('chart-mes', [{
+          x: labels, y: totales, type: 'bar',
+          marker: { color: '#38bdf8', opacity: 0.85 }
+        }], plotlyLayout(), plotlyConfig);
+      } else {
+        document.getElementById('chart-mes').innerHTML = '<div class="empty" style="padding:30px">Sin datos</div>';
+      }
+
+      // Warnings por tipo
+      if (warnings_por_tipo.length > 0) {
+        const tipos = warnings_por_tipo.map(w => w.tipo);
+        const totales = warnings_por_tipo.map(w => w.total);
+        Plotly.newPlot('chart-tipo', [{
+          y: tipos, x: totales, type: 'bar', orientation: 'h',
+          marker: { color: TYPE_COLORS.slice(0, tipos.length) }
+        }], plotlyLayout({ margin: { t: 8, r: 12, b: 30, l: 160 } }), plotlyConfig);
+      } else {
+        document.getElementById('chart-tipo').innerHTML = '<div class="empty" style="padding:30px">Sin datos</div>';
+      }
+    }
+
+    // ── MAPA ESTADO ───────────────────────────────────────────
+
+    async function loadMapa() {
+      const el = document.getElementById('mapa-content');
+      el.innerHTML = '<div class="loading">Cargando...</div>';
+
+      const res = await fetch(`${API}/mapa-estado/${parqueActual.codigo}`);
+      const data = await res.json();
+
+      const cards = data.turbinas.map(t => {
+        const insp = t.ultima_inspeccion;
+        const del = insp?.categoria_delantera || 'ND';
+        const tras = insp?.categoria_trasera || 'ND';
+        return `
+          <div class="turbina-card" onclick="selectTurbina(${t.id}, '${t.codigo}')">
+            <div class="t-code">${t.codigo}</div>
+            <div class="t-badges">
+              <div class="t-badge">
+                <div class="t-dot ${dotClass(del)}">${del}</div>
+                <div class="t-dot-label">Del</div>
+              </div>
+              <div class="t-badge">
+                <div class="t-dot ${dotClass(tras)}">${tras}</div>
+                <div class="t-dot-label">Tras</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      el.innerHTML = `<div class="turbinas-grid">${cards}</div>`;
+    }
+
+    // ── POR TURBINA ───────────────────────────────────────────
+
+    async function loadTurbinasSidebar() {
+      const sidebar = document.getElementById('turbina-sidebar');
+      sidebar.innerHTML = '<div class="loading">Cargando...</div>';
+
+      const res = await fetch(`${API}/mapa-estado/${parqueActual.codigo}`);
+      const data = await res.json();
+
+      sidebar.innerHTML = data.turbinas.map(t => {
+        const insp = t.ultima_inspeccion;
+        const del = insp?.categoria_delantera || 'ND';
+        const tras = insp?.categoria_trasera || 'ND';
+        const worst = worstCat(del, tras);
+        const color = CAT_COLORS[worst] || CAT_COLORS.ND;
+        return `
+          <div class="sidebar-item" id="sidebar-${t.id}"
+               onclick="selectTurbina(${t.id}, '${t.codigo}')">
+            <span>${t.codigo}</span>
+            <div class="sidebar-dot ${dotClass(worst)}"
+                 style="background:${color}20; color:${color}; border:1px solid ${color}50">
+              ${worst}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function selectTurbina(id, codigo) {
+      // Switch to turbina tab if not already
+      if (getActiveTab() !== 'turbina') {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.querySelector('[data-tab="turbina"]').classList.add('active');
+        document.getElementById('tab-turbina').classList.add('active');
+        await loadTurbinasSidebar();
+      }
+
+      // Mark active
+      document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
+      const si = document.getElementById(`sidebar-${id}`);
+      if (si) { si.classList.add('active'); si.scrollIntoView({ block: 'nearest' }); }
+
+      const detail = document.getElementById('turbina-detail');
+      detail.innerHTML = '<div class="loading">Cargando...</div>';
+
+      const res = await fetch(`${API}/turbina/${id}`);
+      const d = await res.json();
+      const { turbina, inspecciones, warnings_por_mes, warnings_por_tipo } = d;
+      const ultima = inspecciones[0];
+
+      // Aggregate tipo (may have multiple rows per tipo across months)
+      const tipoMap = {};
+      warnings_por_tipo.forEach(w => {
+        tipoMap[w.tipo] = (tipoMap[w.tipo] || 0) + w.cantidad;
+      });
+      const tipos = Object.keys(tipoMap);
+      const totalesTipo = Object.values(tipoMap);
+
+      const mesLabels = warnings_por_mes.map(w => mesLabel(w.mes, w.anio));
+      const mesCants = warnings_por_mes.map(w => w.cantidad);
+
+      // Guarda turbina activa para recargar despues de editar
+      turbinaActivaId = id;
+      turbinaActivaCodigo = codigo;
+
+      function renderTablaInspecciones(inspList) {
+        if (inspList.length === 0) return '<div class="empty">Sin inspecciones registradas.</div>';
+        const rows = inspList.map(i => `
+          <tr id="insp-row-${i.id}">
+            <td>${i.fecha}</td>
+            <td>${i.tipo_evento}</td>
+            <td><span class="${catClass(i.categoria_delantera)}" style="font-weight:600">${i.categoria_delantera}</span></td>
+            <td><span class="${catClass(i.categoria_trasera)}" style="font-weight:600">${i.categoria_trasera}</span></td>
+            <td style="color:var(--muted)">${i.comentarios || '—'}</td>
+            <td style="white-space:nowrap">
+              <button class="btn-revertir" onclick="editarInspeccion(${i.id}, '${i.tipo_evento}', '${i.categoria_delantera}', '${i.categoria_trasera}', '${i.comentarios || ''}')">Editar</button>
+              <button class="btn-revertir" style="margin-left:4px" onclick="eliminarInspeccion(${i.id})">Eliminar</button>
+            </td>
+          </tr>
+        `).join('');
+        return `
+          <table class="insp-table">
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Tipo evento</th>
+                <th>Cat. Del</th><th>Cat. Tras</th><th>Comentarios</th><th></th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+      }
+
+      detail.innerHTML = `
+        <div class="t-status-header">
+          <div class="t-status-name">${turbina.codigo}</div>
+          ${ultima ? `
+            <div class="t-status-badge">
+              Del <strong class="${catClass(ultima.categoria_delantera)}">${ultima.categoria_delantera}</strong>
+            </div>
+            <div class="t-status-badge">
+              Tras <strong class="${catClass(ultima.categoria_trasera)}">${ultima.categoria_trasera}</strong>
+            </div>
+            <div class="t-status-date">Última inspección: ${ultima.fecha}</div>
+          ` : `<span style="color:var(--muted); font-size:13px">Sin inspecciones</span>`}
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-box">
+            <div class="chart-title">Warnings por mes</div>
+            <div id="ct-mes" style="height:180px"></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">Warnings por tipo</div>
+            <div id="ct-tipo" style="height:180px"></div>
+          </div>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-title">Historial de inspecciones</div>
+          <div id="tabla-inspecciones">${renderTablaInspecciones(inspecciones)}</div>
+        </div>
+      `;
+
+      if (mesLabels.length > 0) {
+        Plotly.newPlot('ct-mes', [{
+          x: mesLabels, y: mesCants, type: 'bar',
+          marker: { color: '#38bdf8', opacity: 0.85 }
+        }], plotlyLayout(), plotlyConfig);
+      } else {
+        document.getElementById('ct-mes').innerHTML =
+          '<div class="empty" style="padding:30px">Sin warnings</div>';
+      }
+
+      if (tipos.length > 0) {
+        Plotly.newPlot('ct-tipo', [{
+          y: tipos, x: totalesTipo, type: 'bar', orientation: 'h',
+          marker: { color: TYPE_COLORS.slice(0, tipos.length) }
+        }], plotlyLayout({ margin: { t: 8, r: 12, b: 30, l: 155 } }), plotlyConfig);
+      } else {
+        document.getElementById('ct-tipo').innerHTML =
+          '<div class="empty" style="padding:30px">Sin warnings</div>';
+      }
+    }
+
+    // ── EDICION INSPECCIONES ─────────────────────────────────
+
+    const CATS = ['A','B','C','D','ND'];
+
+    function editarInspeccion(id, tipoEvento, catDel, catTras, comentarios) {
+      const row = document.getElementById(`insp-row-${id}`);
+      if (!row) return;
+
+      const opsCat = CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+
+      row.innerHTML = `
+        <td style="color:var(--muted); font-size:12px">${row.querySelector('td').textContent}</td>
+        <td><input id="edit-tipo-${id}" class="form-select" style="min-width:160px" value="${tipoEvento}"></td>
+        <td>
+          <select id="edit-del-${id}" class="form-select" style="width:70px">${opsCat}</select>
+        </td>
+        <td>
+          <select id="edit-tras-${id}" class="form-select" style="width:70px">${opsCat}</select>
+        </td>
+        <td><input id="edit-com-${id}" class="form-select" style="min-width:120px" value="${comentarios}"></td>
+        <td style="white-space:nowrap">
+          <button class="btn-primary" style="width:auto; padding:4px 12px; font-size:12px" onclick="guardarInspeccion(${id})">Guardar</button>
+          <button class="btn-revertir" style="margin-left:4px" onclick="selectTurbina(turbinaActivaId, turbinaActivaCodigo)">Cancelar</button>
+        </td>
+      `;
+
+      // Set selected values after rendering
+      document.getElementById(`edit-del-${id}`).value = catDel;
+      document.getElementById(`edit-tras-${id}`).value = catTras;
+    }
+
+    async function guardarInspeccion(id) {
+      const tipo = document.getElementById(`edit-tipo-${id}`).value.trim();
+      const del = document.getElementById(`edit-del-${id}`).value;
+      const tras = document.getElementById(`edit-tras-${id}`).value;
+      const com = document.getElementById(`edit-com-${id}`).value.trim();
+
+      if (!tipo) { alert('El tipo de evento no puede estar vacío.'); return; }
+
+      const body = {
+        tipo_evento: tipo,
+        categoria_delantera: del,
+        categoria_trasera: tras,
+        comentarios: com || null,
+      };
+
+      const res = await fetch(`${API}/inspeccion/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        // Recarga el detalle de la turbina para reflejar el cambio
+        await selectTurbina(turbinaActivaId, turbinaActivaCodigo);
+      } else {
+        const data = await res.json();
+        alert(`Error al guardar: ${data.detail}`);
+      }
+    }
+
+    async function eliminarInspeccion(id) {
+      if (!confirm(`Eliminar esta inspección? Esta acción no se puede deshacer.`)) return;
+
+      const res = await fetch(`${API}/inspeccion/${id}`, { method: 'DELETE' });
+
+      if (res.ok) {
+        await selectTurbina(turbinaActivaId, turbinaActivaCodigo);
+      } else {
+        const data = await res.json();
+        alert(`Error al eliminar: ${data.detail}`);
+      }
+    }
+
+    // ── ADMIN ─────────────────────────────────────────────────
+
+    function onTipoCambio() {
+      const tipo = document.getElementById('admin-tipo').value;
+      const selectParque = document.getElementById('admin-parque');
+      if (tipo === 'seed_warnings') {
+        selectParque.value = 'PSP';
+        selectParque.disabled = true;
+      } else {
+        selectParque.disabled = false;
+      }
+    }
+
+    async function loadAdmin() {
+      const sel = document.getElementById('admin-parque');
+      if (sel.options.length === 0) {
+        parques.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.codigo;
+          opt.textContent = p.nombre;
+          sel.appendChild(opt);
+        });
+        sel.value = parqueActual.codigo;
+      }
+      await loadCargas();
+    }
+
+    async function loadCargas() {
+      const codigo = document.getElementById('admin-parque')?.value || parqueActual.codigo;
+      const el = document.getElementById('admin-cargas');
+      el.innerHTML = '<div class="loading">Cargando...</div>';
+
+      const res = await fetch(`${API}/admin/cargas/${codigo}`);
+      const cargas = await res.json();
+
+      if (cargas.length === 0) {
+        el.innerHTML = '<div class="empty">Sin cargas registradas para este parque.</div>';
+        return;
+      }
+
+      const rows = cargas.map(c => {
+        const fecha = c.fecha_carga ? c.fecha_carga.replace('T', ' ').slice(0, 16) : '—';
+        const puedeRevertir = c.estado === 'exitosa';
+        return `
+          <tr>
+            <td style="color:var(--muted); font-size:12px">#${c.id}</td>
+            <td>${c.tipo_archivo}</td>
+            <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:12px">${c.nombre_archivo}</td>
+            <td style="color:var(--muted); font-size:12px">${fecha}</td>
+            <td>${c.registros_insertados ?? '—'}</td>
+            <td><span class="estado-badge estado-${c.estado}">${c.estado}</span></td>
+            <td>${puedeRevertir ? `<button class="btn-revertir" onclick="revertirCarga(${c.id})">Revertir</button>` : '—'}</td>
+          </tr>
+        `;
+      }).join('');
+
+      el.innerHTML = `
+        <table class="cargas-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Tipo</th><th>Archivo</th>
+              <th>Fecha</th><th>Registros</th><th>Estado</th><th></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    async function subirArchivo() {
+      const archivo = document.getElementById('admin-archivo').files[0];
+      const tipo = document.getElementById('admin-tipo').value;
+      const codigo = document.getElementById('admin-parque').value;
+      const feedback = document.getElementById('admin-feedback');
+      const btn = document.getElementById('admin-submit');
+
+      if (!archivo) {
+        feedback.className = 'form-feedback err';
+        feedback.textContent = 'Seleccioná un archivo antes de cargar.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Cargando...';
+      feedback.className = 'form-feedback';
+      feedback.textContent = '';
+
+      const form = new FormData();
+      form.append('archivo', archivo);
+      form.append('codigo_parque', codigo);
+      form.append('tipo_carga', tipo);
+
+      try {
+        const res = await fetch(`${API}/admin/cargar`, { method: 'POST', body: form });
+        const data = await res.json();
+
+        if (res.ok) {
+          feedback.className = 'form-feedback ok';
+          feedback.textContent = `Carga exitosa — ${data.registros_insertados ?? ''} registros insertados (ID #${data.carga_id})`;
+          document.getElementById('admin-archivo').value = '';
+          await loadCargas();
+        } else {
+          feedback.className = 'form-feedback err';
+          feedback.textContent = `Error: ${data.detail}`;
+        }
+      } catch (e) {
+        feedback.className = 'form-feedback err';
+        feedback.textContent = 'No se pudo conectar con la API.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Cargar';
+      }
+    }
+
+    async function revertirCarga(id) {
+      if (!confirm(`Revertir la carga #${id}? Se eliminaran todos sus registros.`)) return;
+
+      const res = await fetch(`${API}/admin/carga/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (res.ok) {
+        await loadCargas();
+      } else {
+        alert(`Error al revertir: ${data.detail}`);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

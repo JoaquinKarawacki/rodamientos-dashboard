@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from app.modelos.turbina import Turbina
 from app.modelos.warning_por_tipo import WarningPorTipo
 
 
@@ -44,3 +45,33 @@ class RepositorioWarningPorTipo:
             .delete()
         )
     
+    def obtener_totales_por_tipo(self, parque_id: int) -> list:
+        from sqlalchemy import func
+        from app.modelos.turbina import Turbina
+        return (
+            self.sesion.query(
+                WarningPorTipo.tipo,
+                func.sum(WarningPorTipo.cantidad).label("total")
+            )
+            .join(Turbina)
+            .filter(Turbina.parque_id == parque_id)
+            .group_by(WarningPorTipo.tipo)
+            .order_by(WarningPorTipo.tipo)
+            .all()
+        )
+
+    def obtener_por_turbina(self, turbina_id: int) -> list[WarningPorTipo]:
+        return (
+            self.sesion.query(WarningPorTipo)
+            .filter_by(turbina_id=turbina_id)
+            .order_by(WarningPorTipo.tipo)
+            .all()
+        )    
+    
+    def obtener_todas_por_parque(self, parque_id: int) -> list[WarningPorTipo]:
+        return (
+            self.sesion.query(WarningPorTipo)
+            .join(Turbina)
+            .filter(Turbina.parque_id == parque_id)
+            .all()
+        )

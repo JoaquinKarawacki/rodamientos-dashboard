@@ -20,3 +20,6 @@ class RepositorioTurbina:
             .order_by(Turbina.numero)
             .all()
         )
+    
+    def obtener_por_id(self, turbina_id: int) -> Turbina | None:
+        return self.sesion.query(Turbina).filter_by(id=turbina_id).first()
