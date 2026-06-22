@@ -69,6 +69,10 @@ def parsear_estado_rodamientos(ruta_archivo: str) -> list[dict]:
     idx = _encontrar_header(filas, "WEC")
     col = {_normalizar(nombre): i for i, nombre in enumerate(filas[idx])}
 
+    idx_joao_fecha = col.get("Insp. Joao (fecha)")
+    idx_joao_clase = col.get("Insp. Joao (clase)")
+    idx_joao_com   = col.get("Insp. Joao (comentario)")
+
     registros = []
     for fila in filas[idx + 1:]:
         codigo = _normalizar(fila[col["WEC"]])
@@ -85,6 +89,24 @@ def parsear_estado_rodamientos(ruta_archivo: str) -> list[dict]:
             "cambio_rodamiento_trasero":   _a_fecha(fila[col["Cambio Rod. Trasero"]]),
             "comentarios":                 None,
         })
+
+        # Inspecciones Joao (solo presentes en PSP cuando tienen datos)
+        if idx_joao_fecha is not None:
+            joao_fecha = _a_fecha(fila[idx_joao_fecha])
+            if joao_fecha is not None:
+                clase = _normalizar(fila[idx_joao_clase]) if idx_joao_clase is not None else ""
+                clase = clase or "ND"
+                comentario = _normalizar(fila[idx_joao_com]) if idx_joao_com is not None else None
+                registros.append({
+                    "codigo_turbina":              codigo,
+                    "categoria_delantera":         clase,
+                    "categoria_trasera":           clase,
+                    "fecha":                       joao_fecha,
+                    "tipo_evento":                 "Insp. Joao",
+                    "cambio_rodamiento_delantero": None,
+                    "cambio_rodamiento_trasero":   None,
+                    "comentarios":                 comentario or None,
+                })
 
     return registros
 
