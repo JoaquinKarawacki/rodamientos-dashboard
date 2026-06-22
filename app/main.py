@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+import os
 from app.rutas import exportar, inspecciones, parques, mapa_estado, resumen, turbina, admin
 
 app = FastAPI(title="Dashboard de Rodamientos")
@@ -22,4 +24,5 @@ app.include_router(exportar.router)
 
 @app.get("/")
 def raiz():
-    return {"mensaje": "API Rodamientos OK"}
+    html_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
+    return FileResponse(html_path, media_type="text/html")

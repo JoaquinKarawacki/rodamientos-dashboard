@@ -17,7 +17,8 @@ def _a_fecha(valor) -> date | None:
     """
     Convierte una celda a date. Maneja:
       - datetime / date (openpyxl con celdas de fecha reales)
-      - str en formato ISO 'YYYY-MM-DD' (cuando la fecha esta como texto)
+      - str en formato ISO 'YYYY-MM-DD'
+      - str en formato 'DD/MM/YYYY' (algunas celdas de Excel quedan como texto)
     """
     if valor is None:
         return None
@@ -26,8 +27,13 @@ def _a_fecha(valor) -> date | None:
     if isinstance(valor, date):
         return valor
     if isinstance(valor, str):
+        val = valor.strip()
         try:
-            return date.fromisoformat(valor.strip()[:10])
+            return date.fromisoformat(val[:10])  # YYYY-MM-DD
+        except ValueError:
+            pass
+        try:
+            return datetime.strptime(val[:10], "%d/%m/%Y").date()  # DD/MM/YYYY
         except ValueError:
             return None
     return None
