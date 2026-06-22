@@ -44,10 +44,6 @@ def exportar_dashboard(codigo_parque: str, sesion: Session = Depends(obtener_ses
         inspecciones = insp_idx.get(t.id, [])
         ultima = inspecciones[0] if inspecciones else None
 
-        tipo_agg = {}
-        for w in warn_tipo_idx.get(t.id, []):
-            tipo_agg[w.tipo] = tipo_agg.get(w.tipo, 0) + w.cantidad
-
         turbinas_data.append({
             "id": t.id,
             "codigo": t.codigo,
@@ -75,8 +71,8 @@ def exportar_dashboard(codigo_parque: str, sesion: Session = Depends(obtener_ses
                 for w in warn_mes_idx.get(t.id, [])
             ],
             "warnings_por_tipo": [
-                {"tipo": tipo, "cantidad": cant}
-                for tipo, cant in sorted(tipo_agg.items())
+                {"tipo": w.tipo, "cantidad": w.cantidad, "mes": w.mes, "anio": w.anio}
+                for w in warn_tipo_idx.get(t.id, [])
             ],
         })
 
@@ -90,10 +86,6 @@ def exportar_dashboard(codigo_parque: str, sesion: Session = Depends(obtener_ses
     for w in all_warn_mes:
         key = (w.mes, w.anio)
         warn_mes_global[key] = warn_mes_global.get(key, 0) + w.cantidad
-
-    warn_tipo_global = {}
-    for w in all_warn_tipo:
-        warn_tipo_global[w.tipo] = warn_tipo_global.get(w.tipo, 0) + w.cantidad
 
     data = {
         "parque": {
@@ -113,8 +105,8 @@ def exportar_dashboard(codigo_parque: str, sesion: Session = Depends(obtener_ses
                 for (mes, anio), total in sorted(warn_mes_global.items(), key=lambda x: (x[0][1], x[0][0]))
             ],
             "warnings_por_tipo": [
-                {"tipo": tipo, "total": total}
-                for tipo, total in sorted(warn_tipo_global.items())
+                {"tipo": w.tipo, "cantidad": w.cantidad, "mes": w.mes, "anio": w.anio}
+                for w in all_warn_tipo
             ],
         },
         "generado": datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC"),

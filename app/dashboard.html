@@ -594,6 +594,91 @@
       border-color: var(--cat-d);
       color: var(--cat-d);
     }
+
+    /* ── FILTER BAR ─────────────────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .filter-bar-label {
+      font-size: 11px;
+      font-weight: 600;
+      font-family: 'Space Grotesk', sans-serif;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .filter-sep {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .filter-input-month {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      padding: 5px 8px;
+      outline: none;
+      transition: border-color 0.15s;
+      color-scheme: dark;
+    }
+
+    .filter-input-month:focus { border-color: var(--accent); }
+
+    .btn-filter-clear {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.15s;
+    }
+
+    .btn-filter-clear:hover { border-color: var(--accent); color: var(--accent); }
+
+    .turbina-bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .t-warn-total {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 20px;
+      padding: 3px 12px;
+      letter-spacing: 0.04em;
+    }
+
+    .t-tipo-pill {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 20px;
+      padding: 3px 9px;
+      background: var(--surface-2);
+      border: 1px solid;
+    }
   </style>
 </head>
 <body>
@@ -710,6 +795,8 @@
     let parqueActual = null;
     let turbinaActivaId = null;
     let turbinaActivaCodigo = null;
+    let resumenDataRaw = null;
+    let turbinaDataRaw = null;
 
     // ── PLOTLY CONFIG ──────────────────────────────────────────
 
@@ -746,6 +833,114 @@
 
     function mesLabel(mes, anio) {
       return `${MESES[mes]} ${anio}`;
+    }
+
+    // ── FILTRO DE FECHA ───────────────────────────────────────
+
+    function parseMes(str) {
+      if (!str) return null;
+      const [anio, mes] = str.split('-').map(Number);
+      return [anio, mes];
+    }
+
+    function mesKey(anio, mes) { return anio * 100 + mes; }
+
+    function filtrarPorRango(arr, desdeStr, hastaStr) {
+      const desde = parseMes(desdeStr);
+      const hasta = parseMes(hastaStr);
+      if (!desde && !hasta) return arr;
+      return arr.filter(w => {
+        if (w.mes == null || w.anio == null) return false;
+        const k = mesKey(w.anio, w.mes);
+        if (desde && k < mesKey(desde[0], desde[1])) return false;
+        if (hasta && k > mesKey(hasta[0], hasta[1])) return false;
+        return true;
+      });
+    }
+
+    function agregarPorTipo(arr) {
+      const m = {};
+      arr.forEach(w => { m[w.tipo] = (m[w.tipo] || 0) + w.cantidad; });
+      return Object.entries(m)
+        .map(([tipo, total]) => ({ tipo, total }))
+        .sort((a, b) => a.tipo.localeCompare(b.tipo));
+    }
+
+    function rangoStr(arr) {
+      let min = null, max = null;
+      arr.forEach(w => {
+        if (w.mes == null || w.anio == null) return;
+        const k = mesKey(w.anio, w.mes);
+        if (min === null || k < mesKey(min[0], min[1])) min = [w.anio, w.mes];
+        if (max === null || k > mesKey(max[0], max[1])) max = [w.anio, w.mes];
+      });
+      const fmt = v => v ? `${v[0]}-${String(v[1]).padStart(2,'0')}` : '';
+      return { min: fmt(min), max: fmt(max) };
+    }
+
+    function filterBarHTML(idDesde, idHasta, min, max) {
+      return `
+        <div class="filter-bar">
+          <span class="filter-bar-label">Periodo</span>
+          <span class="filter-sep">Desde</span>
+          <input type="month" class="filter-input-month" id="${idDesde}"
+                 min="${min}" max="${max}"
+                 onchange="onFiltroChange('${idDesde}','${idHasta}')">
+          <span class="filter-sep">Hasta</span>
+          <input type="month" class="filter-input-month" id="${idHasta}"
+                 min="${min}" max="${max}"
+                 onchange="onFiltroChange('${idDesde}','${idHasta}')">
+          <button class="btn-filter-clear"
+                  onclick="limpiarFiltro('${idDesde}','${idHasta}')">Limpiar</button>
+        </div>`;
+    }
+
+    function limpiarFiltro(idDesde, idHasta) {
+      document.getElementById(idDesde).value = '';
+      document.getElementById(idHasta).value = '';
+      onFiltroChange(idDesde, idHasta);
+    }
+
+    function onFiltroChange(idDesde, idHasta) {
+      const desde = document.getElementById(idDesde).value;
+      const hasta = document.getElementById(idHasta).value;
+      if (idDesde === 'filter-desde-resumen') renderResumenCharts(desde, hasta);
+      else renderTurbinaCharts(desde, hasta);
+    }
+
+    function rellenarMeses(arr, campo) {
+      // Rellena con 0 los meses faltantes entre el min y max del array,
+      // para que la línea temporal sea continua aunque no haya warnings.
+      if (arr.length === 0) return [];
+      const lookup = {};
+      arr.forEach(w => { lookup[mesKey(w.anio, w.mes)] = w[campo]; });
+      const keys = arr.map(w => mesKey(w.anio, w.mes));
+      const minK = Math.min(...keys);
+      const maxK = Math.max(...keys);
+      const result = [];
+      let anio = Math.floor(minK / 100);
+      let mes  = minK % 100;
+      while (mesKey(anio, mes) <= maxK) {
+        result.push({ mes, anio, [campo]: lookup[mesKey(anio, mes)] ?? 0 });
+        mes++;
+        if (mes > 12) { mes = 1; anio++; }
+      }
+      return result;
+    }
+
+    function abrevTipo(tipo) {
+      return tipo.split(/[\s.]/)[0];
+    }
+
+    function tipoConFechaAgrupar(arr) {
+      const m = {};
+      arr.forEach(w => {
+        if (w.mes == null || w.anio == null) return;
+        const key = `${w.tipo}|${w.anio}|${w.mes}`;
+        if (!m[key]) m[key] = { tipo: w.tipo, mes: w.mes, anio: w.anio, cantidad: 0 };
+        m[key].cantidad += w.cantidad;
+      });
+      return Object.values(m);
     }
 
     // ── INIT ──────────────────────────────────────────────────
@@ -813,7 +1008,10 @@
 
       const res = await fetch(`${API}/resumen/${parqueActual.codigo}`);
       const data = await res.json();
+      resumenDataRaw = data;
+
       const { contadores, warnings_por_tipo, warnings_por_mes } = data;
+      const rango = rangoStr([...warnings_por_mes, ...warnings_por_tipo]);
 
       function renderCounterGroup(obj, titulo) {
         const cats = ['A','B','C','D'];
@@ -835,41 +1033,106 @@
       el.innerHTML = `
         ${renderCounterGroup(contadores.delantera, 'Rodamiento Delantero')}
         ${renderCounterGroup(contadores.trasera, 'Rodamiento Trasero')}
-        <div class="charts-row" style="margin-top:8px">
-          <div class="chart-box">
-            <div class="chart-title">Warnings por mes</div>
-            <div id="chart-mes" style="height:200px"></div>
-          </div>
-          <div class="chart-box">
-            <div class="chart-title">Warnings por tipo</div>
-            <div id="chart-tipo" style="height:200px"></div>
+        <div style="margin-top:8px">
+          ${filterBarHTML('filter-desde-resumen', 'filter-hasta-resumen', rango.min, rango.max)}
+          <div class="charts-row">
+            <div class="chart-box">
+              <div class="chart-title">Warnings por mes</div>
+              <div id="chart-mes" style="height:200px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-title">Warnings por tipo</div>
+              <div id="chart-tipo" style="height:200px"></div>
+            </div>
           </div>
         </div>
       `;
 
-      // Warnings por mes
-      if (warnings_por_mes.length > 0) {
-        const labels = warnings_por_mes.map(w => mesLabel(w.mes, w.anio));
-        const totales = warnings_por_mes.map(w => w.total);
-        Plotly.newPlot('chart-mes', [{
-          x: labels, y: totales, type: 'bar',
-          marker: { color: '#38bdf8', opacity: 0.85 }
-        }], plotlyLayout(), plotlyConfig);
-      } else {
-        document.getElementById('chart-mes').innerHTML = '<div class="empty" style="padding:30px">Sin datos</div>';
-      }
+      renderResumenCharts('', '');
+    }
 
-      // Warnings por tipo
-      if (warnings_por_tipo.length > 0) {
-        const tipos = warnings_por_tipo.map(w => w.tipo);
-        const totales = warnings_por_tipo.map(w => w.total);
-        Plotly.newPlot('chart-tipo', [{
-          y: tipos, x: totales, type: 'bar', orientation: 'h',
-          marker: { color: TYPE_COLORS.slice(0, tipos.length) }
+    function renderResumenCharts(desdeStr, hastaStr) {
+      if (!resumenDataRaw) return;
+      const { warnings_por_mes, warnings_por_tipo } = resumenDataRaw;
+
+      const mesFiltrado = rellenarMeses(filtrarPorRango(warnings_por_mes, desdeStr, hastaStr), 'total');
+      const todoTipo    = filtrarPorRango(warnings_por_tipo, desdeStr, hastaStr);
+      const tipoChart   = tipoConFechaAgrupar(todoTipo);
+
+      const mesEl  = document.getElementById('chart-mes');
+      const tipoEl = document.getElementById('chart-tipo');
+
+      // Breakdown (right chart)
+      const tipoAgr = agregarPorTipo(todoTipo);
+      if (tipoAgr.length > 0) {
+        Plotly.react('chart-tipo', [{
+          y: tipoAgr.map(w => w.tipo),
+          x: tipoAgr.map(w => w.total),
+          type: 'bar', orientation: 'h',
+          marker: { color: TYPE_COLORS.slice(0, tipoAgr.length) }
         }], plotlyLayout({ margin: { t: 8, r: 12, b: 30, l: 160 } }), plotlyConfig);
       } else {
-        document.getElementById('chart-tipo').innerHTML = '<div class="empty" style="padding:30px">Sin datos</div>';
+        Plotly.purge('chart-tipo');
+        tipoEl.innerHTML = '<div class="empty" style="padding:30px">Sin datos</div>';
       }
+
+      // Stacked bar chart (left chart)
+      if (mesFiltrado.length === 0) {
+        Plotly.purge('chart-mes');
+        mesEl.innerHTML = '<div class="empty" style="padding:30px">Sin datos</div>';
+        return;
+      }
+
+      const xLabels  = mesFiltrado.map(w => mesLabel(w.mes, w.anio));
+      const tiposSet = [...new Set(tipoChart.map(w => w.tipo))].sort();
+
+      let traces;
+      if (tiposSet.length > 0) {
+        const colorMap = {};
+        tiposSet.forEach((t, i) => { colorMap[t] = TYPE_COLORS[i % TYPE_COLORS.length]; });
+        traces = tiposSet.map(tipo => ({
+          x: xLabels,
+          y: mesFiltrado.map(m =>
+            tipoChart
+              .filter(w => w.tipo === tipo && w.mes === m.mes && w.anio === m.anio)
+              .reduce((s, w) => s + w.cantidad, 0)
+          ),
+          type: 'bar',
+          name: tipo,
+          marker: { color: colorMap[tipo] },
+        }));
+        const accountedY = mesFiltrado.map((m, idx) =>
+          traces.reduce((s, tr) => s + (tr.y[idx] || 0), 0)
+        );
+        const gapY = mesFiltrado.map((m, idx) => Math.max(0, m.total - accountedY[idx]));
+        if (gapY.some(v => v > 0)) {
+          traces.push({
+            x: xLabels, y: gapY,
+            type: 'bar', name: 'Sin desglose',
+            marker: { color: '#3d4a5c' }, showlegend: true,
+          });
+        }
+      } else {
+        traces = [{
+          x: xLabels,
+          y: mesFiltrado.map(w => w.total),
+          type: 'bar',
+          marker: { color: '#38bdf8', opacity: 0.85 }
+        }];
+      }
+
+      const layout = {
+        ...plotlyLayout({ margin: { t: 8, r: 12, b: 56, l: 40 } }),
+        barmode: 'stack',
+        showlegend: tiposSet.length > 1,
+        legend: {
+          bgcolor: 'transparent', bordercolor: 'transparent',
+          font: { size: 10, color: '#dde3f0' },
+          orientation: 'h', y: -0.3, x: 0,
+        },
+      };
+
+      Plotly.react('chart-mes', traces, layout, plotlyConfig);
     }
 
     // ── MAPA ESTADO ───────────────────────────────────────────
@@ -956,20 +1219,16 @@
       const { turbina, inspecciones, warnings_por_mes, warnings_por_tipo } = d;
       const ultima = inspecciones[0];
 
-      // Aggregate tipo (may have multiple rows per tipo across months)
-      const tipoMap = {};
-      warnings_por_tipo.forEach(w => {
-        tipoMap[w.tipo] = (tipoMap[w.tipo] || 0) + w.cantidad;
-      });
-      const tipos = Object.keys(tipoMap);
-      const totalesTipo = Object.values(tipoMap);
-
-      const mesLabels = warnings_por_mes.map(w => mesLabel(w.mes, w.anio));
-      const mesCants = warnings_por_mes.map(w => w.cantidad);
-
       // Guarda turbina activa para recargar despues de editar
       turbinaActivaId = id;
       turbinaActivaCodigo = codigo;
+
+      // Guarda datos crudos para el filtro de fecha
+      turbinaDataRaw = { warnings_por_mes, warnings_por_tipo, inspecciones };
+      const rango = rangoStr([...warnings_por_mes, ...warnings_por_tipo]);
+
+      const totalWarnings = warnings_por_tipo.reduce((s, w) => s + w.cantidad, 0);
+      const topTipos = agregarPorTipo(warnings_por_tipo).sort((a, b) => b.total - a.total).slice(0, 4);
 
       function renderTablaInspecciones(inspList) {
         if (inspList.length === 0) return '<div class="empty">Sin inspecciones registradas.</div>';
@@ -990,8 +1249,8 @@
           <table class="insp-table">
             <thead>
               <tr>
-                <th>Fecha</th><th>Tipo evento</th>
-                <th>Cat. Del</th><th>Cat. Tras</th><th>Comentarios</th><th></th>
+                <th>Fecha</th><th>Evento</th>
+                <th>Del</th><th>Tras</th><th>Comentarios</th><th></th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -1002,6 +1261,7 @@
       detail.innerHTML = `
         <div class="t-status-header">
           <div class="t-status-name">${turbina.codigo}</div>
+          <span class="t-warn-total">${totalWarnings} warnings</span>
           ${ultima ? `
             <div class="t-status-badge">
               Del <strong class="${catClass(ultima.categoria_delantera)}">${ultima.categoria_delantera}</strong>
@@ -1009,46 +1269,152 @@
             <div class="t-status-badge">
               Tras <strong class="${catClass(ultima.categoria_trasera)}">${ultima.categoria_trasera}</strong>
             </div>
-            <div class="t-status-date">Última inspección: ${ultima.fecha}</div>
-          ` : `<span style="color:var(--muted); font-size:13px">Sin inspecciones</span>`}
+          ` : ''}
+          ${topTipos.map((t, i) => `<span class="t-tipo-pill" style="color:${TYPE_COLORS[i]};border-color:${TYPE_COLORS[i]}40">${abrevTipo(t.tipo)} ${t.total}</span>`).join('')}
+          ${ultima ? `<div class="t-status-date">Última inspección: ${ultima.fecha}</div>` : `<span style="color:var(--muted); font-size:13px">Sin inspecciones</span>`}
         </div>
 
-        <div class="charts-row">
-          <div class="chart-box">
-            <div class="chart-title">Warnings por mes</div>
-            <div id="ct-mes" style="height:180px"></div>
-          </div>
-          <div class="chart-box">
-            <div class="chart-title">Warnings por tipo</div>
-            <div id="ct-tipo" style="height:180px"></div>
-          </div>
-        </div>
+        ${filterBarHTML('filter-desde-turbina', 'filter-hasta-turbina', rango.min, rango.max)}
 
         <div class="chart-box">
-          <div class="chart-title">Historial de inspecciones</div>
-          <div id="tabla-inspecciones">${renderTablaInspecciones(inspecciones)}</div>
+          <div class="chart-title">Warnings mes a mes — por tipo</div>
+          <div id="ct-mes" style="height:270px"></div>
+        </div>
+
+        <div class="turbina-bottom-grid">
+          <div class="chart-box">
+            <div class="chart-title">Tipos de warnings</div>
+            <div id="ct-tipo" style="height:200px"></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">Historial inspecciones y mantenimiento</div>
+            <div id="tabla-inspecciones">${renderTablaInspecciones(inspecciones)}</div>
+          </div>
         </div>
       `;
 
-      if (mesLabels.length > 0) {
-        Plotly.newPlot('ct-mes', [{
-          x: mesLabels, y: mesCants, type: 'bar',
-          marker: { color: '#38bdf8', opacity: 0.85 }
-        }], plotlyLayout(), plotlyConfig);
-      } else {
-        document.getElementById('ct-mes').innerHTML =
-          '<div class="empty" style="padding:30px">Sin warnings</div>';
-      }
+      renderTurbinaCharts('', '');
+    }
 
-      if (tipos.length > 0) {
-        Plotly.newPlot('ct-tipo', [{
-          y: tipos, x: totalesTipo, type: 'bar', orientation: 'h',
-          marker: { color: TYPE_COLORS.slice(0, tipos.length) }
+    function renderTurbinaCharts(desdeStr, hastaStr) {
+      if (!turbinaDataRaw) return;
+      const { warnings_por_mes, warnings_por_tipo, inspecciones } = turbinaDataRaw;
+
+      const mesEl  = document.getElementById('ct-mes');
+      const tipoEl = document.getElementById('ct-tipo');
+      if (!mesEl || !tipoEl) return;
+
+      const mesFiltrado = rellenarMeses(filtrarPorRango(warnings_por_mes, desdeStr, hastaStr), 'cantidad');
+      const todoTipo    = filtrarPorRango(warnings_por_tipo, desdeStr, hastaStr);
+      const tipoChart   = todoTipo.filter(w => w.mes != null && w.anio != null);
+
+      // ── Breakdown horizontal (bottom-left) ───────────────────
+      const tipoAgr = agregarPorTipo(todoTipo);
+      if (tipoAgr.length > 0) {
+        Plotly.react(tipoEl, [{
+          y: tipoAgr.map(w => w.tipo),
+          x: tipoAgr.map(w => w.total),
+          type: 'bar', orientation: 'h',
+          marker: { color: tipoAgr.map((_, i) => TYPE_COLORS[i % TYPE_COLORS.length]) }
         }], plotlyLayout({ margin: { t: 8, r: 12, b: 30, l: 155 } }), plotlyConfig);
       } else {
-        document.getElementById('ct-tipo').innerHTML =
-          '<div class="empty" style="padding:30px">Sin warnings</div>';
+        Plotly.purge(tipoEl);
+        tipoEl.innerHTML = '<div class="empty" style="padding:30px">Sin warnings</div>';
       }
+
+      // ── Stacked chart (main, top) ─────────────────────────────
+      if (mesFiltrado.length === 0) {
+        Plotly.purge(mesEl);
+        mesEl.innerHTML = '<div class="empty" style="padding:30px">Sin warnings</div>';
+        return;
+      }
+
+      const xLabels  = mesFiltrado.map(m => mesLabel(m.mes, m.anio));
+      const tiposSet = [...new Set(tipoChart.map(w => w.tipo))].sort();
+
+      let traces;
+      if (tiposSet.length > 0) {
+        const colorMap = {};
+        tiposSet.forEach((t, i) => { colorMap[t] = TYPE_COLORS[i % TYPE_COLORS.length]; });
+        traces = tiposSet.map(tipo => ({
+          x: xLabels,
+          y: mesFiltrado.map(m =>
+            tipoChart
+              .filter(w => w.tipo === tipo && w.mes === m.mes && w.anio === m.anio)
+              .reduce((s, w) => s + w.cantidad, 0)
+          ),
+          type: 'bar',
+          name: tipo,
+          marker: { color: colorMap[tipo] },
+        }));
+        // Fill remainder for months without tipo granularity
+        const accountedY = mesFiltrado.map((m, idx) =>
+          traces.reduce((s, tr) => s + (tr.y[idx] || 0), 0)
+        );
+        const gapY = mesFiltrado.map((m, idx) => Math.max(0, m.cantidad - accountedY[idx]));
+        if (gapY.some(v => v > 0)) {
+          traces.push({
+            x: xLabels, y: gapY,
+            type: 'bar', name: 'Sin desglose',
+            marker: { color: '#3d4a5c' }, showlegend: true,
+          });
+        }
+      } else {
+        traces = [{
+          x: xLabels,
+          y: mesFiltrado.map(m => m.cantidad),
+          type: 'bar',
+          name: 'Warnings',
+          marker: { color: '#38bdf8', opacity: 0.85 },
+        }];
+      }
+
+      // Total below each bar
+      const totAnnotations = mesFiltrado
+        .filter(m => m.cantidad > 0)
+        .map(m => ({
+          x: mesLabel(m.mes, m.anio),
+          y: 0, yref: 'y', yanchor: 'top', yshift: -14,
+          text: String(m.cantidad),
+          showarrow: false,
+          font: { color: '#7b869c', size: 10, family: 'Space Grotesk, sans-serif' },
+        }));
+
+      // Vertical dashed lines for inspection events
+      const shapes = [];
+      const inspAnnotations = [];
+      (inspecciones || []).forEach(insp => {
+        if (!insp.fecha) return;
+        const parts = insp.fecha.split('-');
+        const label = mesLabel(parseInt(parts[1]), parseInt(parts[0]));
+        if (!xLabels.includes(label)) return;
+        shapes.push({
+          type: 'line',
+          x0: label, x1: label, y0: 0, y1: 1, yref: 'paper',
+          line: { color: '#22c55e', width: 1.5, dash: 'dash' }
+        });
+        inspAnnotations.push({
+          x: label, y: 0.97, yref: 'paper', xanchor: 'left',
+          text: insp.tipo_evento,
+          showarrow: false, textangle: -90,
+          font: { color: '#22c55e', size: 9, family: 'Inter, sans-serif' },
+        });
+      });
+
+      const layout = {
+        ...plotlyLayout({ margin: { t: 8, r: 12, b: 56, l: 40 } }),
+        barmode: 'stack',
+        shapes,
+        annotations: [...totAnnotations, ...inspAnnotations],
+        showlegend: tiposSet.length > 1,
+        legend: {
+          bgcolor: 'transparent', bordercolor: 'transparent',
+          font: { size: 10, color: '#dde3f0' },
+          orientation: 'h', y: -0.28, x: 0,
+        },
+      };
+
+      Plotly.react('ct-mes', traces, layout, plotlyConfig);
     }
 
     // ── EDICION INSPECCIONES ─────────────────────────────────

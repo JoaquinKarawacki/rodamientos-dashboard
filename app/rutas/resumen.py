@@ -24,9 +24,12 @@ def resumen(codigo_parque: str, sesion: Session = Depends(obtener_sesion)):
         contadores_del[cat_del] += 1
         contadores_tras[cat_tras] += 1
 
-    # Warnings por tipo (total acumulado)
-    filas_tipo = RepositorioWarningPorTipo(sesion).obtener_totales_por_tipo(parque.id)
-    warnings_por_tipo = [{"tipo": f.tipo, "total": f.total} for f in filas_tipo]
+    # Warnings por tipo con granularidad de mes/anio para filtrado client-side
+    filas_tipo = RepositorioWarningPorTipo(sesion).obtener_todas_por_parque(parque.id)
+    warnings_por_tipo = [
+        {"tipo": f.tipo, "cantidad": f.cantidad, "mes": f.mes, "anio": f.anio}
+        for f in filas_tipo
+    ]
 
     # Warnings por mes
     filas_mes = RepositorioWarningPorMes(sesion).obtener_totales_por_mes(parque.id)

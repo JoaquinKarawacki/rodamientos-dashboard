@@ -156,6 +156,16 @@
     }
     .t-status-badge strong { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; }
     .t-status-date { margin-left: auto; font-size: 12px; color: var(--muted); }
+    .t-warn-total {
+      font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700;
+      color: var(--accent); background: rgba(228,23,20,0.06);
+      border: 1px solid rgba(228,23,20,0.25); border-radius: 20px; padding: 3px 12px;
+    }
+    .t-tipo-pill {
+      font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600;
+      border-radius: 20px; padding: 3px 9px; background: var(--surface-2); border: 1px solid;
+    }
+    .turbina-bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
     /* ── INSPECTION TABLE ────────────────────────── */
     .insp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -228,48 +238,141 @@
     function dotClass(c) { return ({A:'da',B:'db',C:'dc',D:'dd'})[c] || 'dnd'; }
     function catClass(c) { return 'cat-' + (c||'nd').toLowerCase(); }
     function worstCat(a,b) { return (ORDER[a]||0) >= (ORDER[b]||0) ? a : b; }
+    function abrevTipo(tipo) { return tipo.split(/[\s.]/)[0]; }
+    function mKey(m, a) { return a * 100 + m; }
+
+    function agregarPorTipo(arr) {
+      const m = {};
+      arr.forEach(w => { m[w.tipo] = (m[w.tipo] || 0) + w.cantidad; });
+      return Object.entries(m).map(([tipo, total]) => ({tipo, total})).sort((a,b) => a.tipo.localeCompare(b.tipo));
+    }
+
+    function rellenarMeses(mesData, campo) {
+      if (!mesData.length) return [];
+      const lookup = {};
+      mesData.forEach(w => { lookup[mKey(w.mes, w.anio)] = w[campo]; });
+      const keys = mesData.map(w => mKey(w.mes, w.anio));
+      const minK = Math.min(...keys), maxK = Math.max(...keys);
+      const result = [];
+      let a = Math.floor(minK/100), m = minK % 100;
+      while (mKey(m, a) <= maxK) {
+        result.push({ mes: m, anio: a, [campo]: lookup[mKey(m, a)] || 0 });
+        m++; if (m > 12) { m = 1; a++; }
+      }
+      return result;
+    }
 
     // ── SVG CHARTS ────────────────────────────────
 
-    function svgVBar(vals, labels, color='#E41714') {
-      if (!vals.length) return '<div class="empty">Sin datos</div>';
-      const n = vals.length;
-      const max = Math.max(...vals, 1);
+    const SVG_COLORS = ['#E41714','#2563EB','#EA580C','#D97706','#16A34A','#7C3AED','#0891B2','#BE185D'];
+
+    function svgVBarStacked(mesData, campo, tipoData, inspecciones) {
+      const filled = rellenarMeses(mesData, campo);
+      if (!filled.length) return '<div class="empty">Sin datos</div>';
+
+      const tipoConFecha = tipoData.filter(w => w.mes != null && w.anio != null);
+      const tipos = [...new Set(tipoConFecha.map(w => w.tipo))].sort();
+      const colorMap = {};
+      tipos.forEach((t, i) => { colorMap[t] = SVG_COLORS[i % SVG_COLORS.length]; });
+
+      const n = filled.length;
+      const max = Math.max(...filled.map(w => w[campo]), 1);
       const ticks = 4;
       const step = Math.ceil(max / ticks) || 1;
       const niceMax = step * ticks;
-      const barW = Math.max(18, Math.min(50, Math.floor(520 / n) - 8));
+      const barW = Math.max(16, Math.min(46, Math.floor(520 / n) - 8));
       const gap = 6;
       const padL = 36, padR = 12, padT = 10, padB = n > 8 ? 54 : 38;
       const plotW = n * (barW + gap);
       const W = Math.max(300, padL + plotW + padR);
-      const H = 190;
+      const H = 200;
       const plotH = H - padT - padB;
+
+      const xIdx = {};
+      filled.forEach((m, i) => { xIdx[mKey(m.mes, m.anio)] = i; });
+
+      let hasGap = false;
       let o = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible">`;
+
       for (let t = 0; t <= ticks; t++) {
         const v = step * t;
         const y = padT + plotH * (1 - v/niceMax);
         o += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#E0E0E0" stroke-width="1"/>`;
         o += `<text x="${padL-5}" y="${y+4}" text-anchor="end" font-size="10" fill="#9CA3AF">${v}</text>`;
       }
-      vals.forEach((v, i) => {
+
+      filled.forEach((m, i) => {
         const x = padL + i*(barW+gap) + gap/2;
-        const bh = Math.max(0, (v/niceMax)*plotH);
-        const y = padT + plotH - bh;
-        o += `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${color}" opacity="0.8" rx="2"/>`;
+        const total = m[campo];
+        let yTop = padT + plotH;
+
+        tipos.forEach(tipo => {
+          const e = tipoConFecha.find(w => w.tipo === tipo && w.mes === m.mes && w.anio === m.anio);
+          const val = e ? e.cantidad : 0;
+          if (val <= 0) return;
+          const bh = (val / niceMax) * plotH;
+          yTop -= bh;
+          o += `<rect x="${x}" y="${yTop}" width="${barW}" height="${bh}" fill="${colorMap[tipo]}" opacity="0.88" rx="1"/>`;
+        });
+
+        const accounted = tipos.reduce((s, tipo) => {
+          const e = tipoConFecha.find(w => w.tipo === tipo && w.mes === m.mes && w.anio === m.anio);
+          return s + (e ? e.cantidad : 0);
+        }, 0);
+        const rem = Math.max(0, total - accounted);
+        if (rem > 0) {
+          hasGap = true;
+          const bh = (rem / niceMax) * plotH;
+          yTop -= bh;
+          o += `<rect x="${x}" y="${yTop}" width="${barW}" height="${bh}" fill="#C0C0C0" opacity="0.65" rx="1"/>`;
+        }
+
+        const lbl = mesLabel(m.mes, m.anio);
         const lx = x + barW/2, ly = H - padB + 14;
         if (n > 8) {
-          o += `<text transform="rotate(-40,${lx},${ly})" x="${lx}" y="${ly}" text-anchor="end" font-size="9" fill="#9CA3AF">${labels[i]}</text>`;
+          o += `<text transform="rotate(-40,${lx},${ly})" x="${lx}" y="${ly}" text-anchor="end" font-size="9" fill="#9CA3AF">${lbl}</text>`;
         } else {
-          o += `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="10" fill="#9CA3AF">${labels[i]}</text>`;
+          o += `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="10" fill="#9CA3AF">${lbl}</text>`;
+        }
+        if (total > 0) {
+          const ty = n > 8 ? ly + 9 : ly + 12;
+          o += `<text x="${lx}" y="${ty}" text-anchor="middle" font-size="9" fill="#BFBFBF">${total}</text>`;
         }
       });
-      return o + '</svg>';
+
+      (inspecciones || []).forEach(insp => {
+        if (!insp.fecha) return;
+        const parts = insp.fecha.split('-');
+        const key = mKey(parseInt(parts[1]), parseInt(parts[0]));
+        const idx = xIdx[key];
+        if (idx === undefined) return;
+        const x = padL + idx*(barW+gap) + gap/2 + barW/2;
+        o += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT+plotH}" stroke="#16A34A" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+        o += `<text transform="rotate(-90,${x},${padT+2})" x="${x}" y="${padT+2}" text-anchor="start" font-size="8" fill="#16A34A">${insp.tipo_evento}</text>`;
+      });
+
+      o += '</svg>';
+
+      const legendItems = tipos.map((t, i) =>
+        `<span style="display:flex;align-items:center;gap:4px">
+          <span style="width:10px;height:10px;background:${colorMap[t]};border-radius:2px;flex-shrink:0"></span>
+          <span style="font-size:10px;color:#737373">${t}</span>
+        </span>`
+      );
+      if (hasGap) legendItems.push(
+        `<span style="display:flex;align-items:center;gap:4px">
+          <span style="width:10px;height:10px;background:#C0C0C0;border-radius:2px;flex-shrink:0"></span>
+          <span style="font-size:10px;color:#737373">Sin desglose</span>
+        </span>`
+      );
+      if (legendItems.length > 1) {
+        o += `<div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px">${legendItems.join('')}</div>`;
+      }
+      return o;
     }
 
     function svgHBar(vals, labels) {
       if (!vals.length) return '<div class="empty">Sin datos</div>';
-      const COLORS = ['#E41714','#737373','#EA580C','#D97706','#9CA3AF','#16A34A'];
       const max = Math.max(...vals, 1);
       const barH = 22, gap = 8, padL = 148, padR = 44, padT = 6, padB = 6;
       const plotW = 280;
@@ -279,7 +382,7 @@
       vals.forEach((v, i) => {
         const y = padT + i*(barH+gap);
         const bw = (v/max)*plotW;
-        const color = COLORS[i % COLORS.length];
+        const color = SVG_COLORS[i % SVG_COLORS.length];
         o += `<text x="${padL-7}" y="${y+barH/2+4}" text-anchor="end" font-size="11" fill="#737373">${labels[i]}</text>`;
         o += `<rect x="${padL}" y="${y}" width="${bw}" height="${barH}" fill="${color}" opacity="0.85" rx="2"/>`;
         o += `<text x="${padL+bw+5}" y="${y+barH/2+4}" font-size="11" fill="#1A1A1A">${v}</text>`;
@@ -317,22 +420,19 @@
         </div>`;
       }
 
-      const mesLabels  = warnings_por_mes.map(w => mesLabel(w.mes, w.anio));
-      const mesVals    = warnings_por_mes.map(w => w.total);
-      const tipoLabels = warnings_por_tipo.map(w => w.tipo);
-      const tipoVals   = warnings_por_tipo.map(w => w.total);
+      const tipoAgr = agregarPorTipo(warnings_por_tipo);
 
       document.getElementById('resumen-content').innerHTML = `
         ${counterGroup(contadores.delantera, 'Rodamiento Delantero')}
         ${counterGroup(contadores.trasera,   'Rodamiento Trasero')}
         <div class="charts-row" style="margin-top:8px">
           <div class="chart-box">
-            <div class="chart-title">Warnings por mes</div>
-            ${svgVBar(mesVals, mesLabels)}
+            <div class="chart-title">Warnings mes a mes — por tipo</div>
+            ${svgVBarStacked(warnings_por_mes, 'total', warnings_por_tipo, [])}
           </div>
           <div class="chart-box">
             <div class="chart-title">Warnings por tipo</div>
-            ${svgHBar(tipoVals, tipoLabels)}
+            ${svgHBar(tipoAgr.map(w => w.total), tipoAgr.map(w => w.tipo))}
           </div>
         </div>`;
     }
@@ -388,10 +488,9 @@
       if (!t) return;
       const ultima = t.inspecciones[0];
 
-      const mesLabels  = t.warnings_por_mes.map(w => mesLabel(w.mes, w.anio));
-      const mesVals    = t.warnings_por_mes.map(w => w.cantidad);
-      const tipoLabels = t.warnings_por_tipo.map(w => w.tipo);
-      const tipoVals   = t.warnings_por_tipo.map(w => w.cantidad);
+      const totalWarnings = t.warnings_por_tipo.reduce((s, w) => s + w.cantidad, 0);
+      const topTipos = agregarPorTipo(t.warnings_por_tipo).sort((a, b) => b.total - a.total).slice(0, 4);
+      const tipoAgr  = agregarPorTipo(t.warnings_por_tipo);
 
       const tablaRows = t.inspecciones.map(i => `<tr>
         <td>${i.fecha}</td>
@@ -404,31 +503,33 @@
       document.getElementById('turbina-detail').innerHTML = `
         <div class="t-status-header">
           <div class="t-status-name">${t.codigo}</div>
+          <span class="t-warn-total">${totalWarnings} warnings</span>
           ${ultima ? `
             <div class="t-status-badge">Del <strong class="${catClass(ultima.categoria_delantera)}">${ultima.categoria_delantera}</strong></div>
             <div class="t-status-badge">Tras <strong class="${catClass(ultima.categoria_trasera)}">${ultima.categoria_trasera}</strong></div>
-            <div class="t-status-date">Última inspección: ${ultima.fecha}</div>
-          ` : `<span style="color:var(--muted);font-size:13px">Sin inspecciones</span>`}
-        </div>
-        <div class="charts-row">
-          <div class="chart-box">
-            <div class="chart-title">Warnings por mes</div>
-            ${svgVBar(mesVals, mesLabels)}
-          </div>
-          <div class="chart-box">
-            <div class="chart-title">Warnings por tipo</div>
-            ${svgHBar(tipoVals, tipoLabels)}
-          </div>
+          ` : ''}
+          ${topTipos.map((tp, i) => `<span class="t-tipo-pill" style="color:${SVG_COLORS[i]};border-color:${SVG_COLORS[i]}40">${abrevTipo(tp.tipo)} ${tp.total}</span>`).join('')}
+          ${ultima ? `<div class="t-status-date">Última inspección: ${ultima.fecha}</div>` : `<span style="color:var(--muted);font-size:13px">Sin inspecciones</span>`}
         </div>
         <div class="chart-box">
-          <div class="chart-title">Historial de inspecciones</div>
-          ${t.inspecciones.length > 0 ? `
-            <table class="insp-table">
-              <thead><tr>
-                <th>Fecha</th><th>Tipo evento</th><th>Cat. Del</th><th>Cat. Tras</th><th>Comentarios</th>
-              </tr></thead>
-              <tbody>${tablaRows}</tbody>
-            </table>` : '<div class="empty">Sin inspecciones.</div>'}
+          <div class="chart-title">Warnings mes a mes — por tipo</div>
+          ${svgVBarStacked(t.warnings_por_mes, 'cantidad', t.warnings_por_tipo, t.inspecciones)}
+        </div>
+        <div class="turbina-bottom-grid">
+          <div class="chart-box">
+            <div class="chart-title">Tipos de warnings</div>
+            ${svgHBar(tipoAgr.map(w => w.total), tipoAgr.map(w => w.tipo))}
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">Historial inspecciones y mantenimiento</div>
+            ${t.inspecciones.length > 0 ? `
+              <table class="insp-table">
+                <thead><tr>
+                  <th>Fecha</th><th>Evento</th><th>Del</th><th>Tras</th><th>Comentarios</th>
+                </tr></thead>
+                <tbody>${tablaRows}</tbody>
+              </table>` : '<div class="empty">Sin inspecciones.</div>'}
+          </div>
         </div>`;
     }
 
