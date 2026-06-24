@@ -390,6 +390,56 @@
       return o + '</svg>';
     }
 
+    function svgBarNoA(turbinas, catKey) {
+      const CAT_COLORS_MAP = { A:'#16A34A', B:'#D97706', C:'#EA580C', D:'#DC2626', ND:'#9CA3AF' };
+      const filtered = turbinas.filter(t => t[catKey] !== 'A');
+      if (!filtered.length) return '<div class="empty">Todas las turbinas en Cat. A</div>';
+
+      const tipos = [...new Set(filtered.flatMap(t => t.warnings.map(w => w.tipo)))].sort();
+      const data = filtered.map(t => {
+        const totals = {};
+        for (const w of t.warnings) totals[w.tipo] = (totals[w.tipo] || 0) + w.cantidad;
+        return { codigo: t.turbina_codigo, cat: t[catKey], totals };
+      });
+
+      const maxTotal = Math.max(1, ...data.map(d => Object.values(d.totals).reduce((s, v) => s + v, 0)));
+      const BAR_W = 40, GAP = 20, H = 140, LABEL_H = 36;
+      const padL = GAP;
+      const W = padL + data.length * (BAR_W + GAP);
+      const LEGEND_ROWS = Math.ceil(tipos.length / 3);
+      const totalH = H + LABEL_H + LEGEND_ROWS * 18 + 8;
+
+      let o = `<svg viewBox="0 0 ${Math.max(W, 540)} ${totalH}" style="width:100%;overflow:visible">`;
+
+      data.forEach((d, i) => {
+        const x = padL + i * (BAR_W + GAP);
+        let yOffset = H;
+        tipos.forEach((tipo, ti) => {
+          const val = d.totals[tipo] || 0;
+          const bh = Math.round((val / maxTotal) * H);
+          if (bh > 0) {
+            yOffset -= bh;
+            o += `<rect x="${x}" y="${yOffset}" width="${BAR_W}" height="${bh}" fill="${SVG_COLORS[ti % SVG_COLORS.length]}" opacity="0.85" rx="1"/>`;
+          }
+        });
+        const cx = x + BAR_W / 2;
+        const catColor = CAT_COLORS_MAP[d.cat] || CAT_COLORS_MAP.ND;
+        o += `<text x="${cx}" y="${H + 14}" text-anchor="middle" font-size="10" fill="#737373">${d.codigo}</text>`;
+        o += `<circle cx="${cx}" cy="${H + 27}" r="8" fill="${catColor}22" stroke="${catColor}" stroke-width="1.5"/>`;
+        o += `<text x="${cx}" y="${H + 31}" text-anchor="middle" font-size="9" fill="${catColor}" font-weight="700">${d.cat}</text>`;
+      });
+
+      const legendY = H + LABEL_H + 4;
+      tipos.forEach((tipo, i) => {
+        const col = i % 3, row = Math.floor(i / 3);
+        const lx = col * 180, ly = legendY + row * 18;
+        o += `<rect x="${lx}" y="${ly}" width="10" height="10" fill="${SVG_COLORS[i % SVG_COLORS.length]}" rx="2"/>`;
+        o += `<text x="${lx + 14}" y="${ly + 9}" font-size="10" fill="#737373">${tipo}</text>`;
+      });
+
+      return o + '</svg>';
+    }
+
     // ── TABS ──────────────────────────────────────
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -404,7 +454,7 @@
     // ── RESUMEN ───────────────────────────────────
 
     function renderResumen() {
-      const { contadores, warnings_por_mes, warnings_por_tipo } = DATA.resumen;
+      const { contadores, warnings_detalle_turbinas } = DATA.resumen;
       const cats = ['A','B','C','D'];
 
       function counterGroup(obj, titulo) {
@@ -420,19 +470,19 @@
         </div>`;
       }
 
-      const tipoAgr = agregarPorTipo(warnings_por_tipo);
+      const det = warnings_detalle_turbinas || [];
 
       document.getElementById('resumen-content').innerHTML = `
         ${counterGroup(contadores.delantera, 'Rodamiento Delantero')}
         ${counterGroup(contadores.trasera,   'Rodamiento Trasero')}
-        <div class="charts-row" style="margin-top:8px">
-          <div class="chart-box">
-            <div class="chart-title">Warnings mes a mes — por tipo</div>
-            ${svgVBarStacked(warnings_por_mes, 'total', warnings_por_tipo, [])}
+        <div style="margin-top:8px">
+          <div class="chart-box" style="margin-bottom:12px">
+            <div class="chart-title">Rodamiento Delantero ≠ A — Warnings histórico por tipo</div>
+            ${svgBarNoA(det, 'categoria_delantera')}
           </div>
           <div class="chart-box">
-            <div class="chart-title">Warnings por tipo</div>
-            ${svgHBar(tipoAgr.map(w => w.total), tipoAgr.map(w => w.tipo))}
+            <div class="chart-title">Rodamiento Trasero ≠ A — Warnings histórico por tipo</div>
+            ${svgBarNoA(det, 'categoria_trasera')}
           </div>
         </div>`;
     }
