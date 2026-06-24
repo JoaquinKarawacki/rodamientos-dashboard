@@ -253,32 +253,27 @@
       overflow-y: hidden;
     }
 
-    /* Badge strip con categorías — renderizado en HTML, fuera del scroll */
-    .wec-badge-strip {
+    /* Leyenda HTML del gráfico Rodamiento ≠ A (renderizada fuera del scroll) */
+    .chart-html-legend {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px 14px;
-      padding: 10px 0 2px 44px; /* left = margen L del chart */
-      border-top: 1px solid var(--border, #272f45);
-      margin-top: 6px;
+      gap: 5px 14px;
+      padding: 4px 4px 8px 44px;
+      font-size: 10px;
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
     }
-    .wec-badge-item {
+    .chart-html-legend .legend-item {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-family: 'Inter', sans-serif;
-      font-size: 11px;
-      color: var(--muted);
+      gap: 5px;
+      white-space: nowrap;
     }
-    .wec-badge-pill {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 1px 7px;
-      border-radius: 20px;
-      border: 1.5px solid;
-      line-height: 1.5;
-      letter-spacing: 0.04em;
+    .chart-html-legend .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
     }
 
     .charts-row {
@@ -1103,28 +1098,36 @@
       buildNoAChart(warnings_detalle_turbinas || [], 'categoria_trasera',   'chart-tras-no-a', desdeStr, hastaStr);
     }
 
+    // Altura del área de barras y del SVG de etiquetas customizadas.
+    // El SVG vive dentro del mismo scroll wrapper que el chart → se desplazan
+    // juntos → alineación pixel-perfecta sin hacks de posicionamiento.
+    const _CHART_H    = 240;   // altura del div de Plotly (sólo barras)
+    const _LABEL_H    = 88;    // altura del SVG de etiquetas: WEC + badge + mes
+    const _MIN_BAR_PX = 80;    // px mínimos por slot (mes × WEC) → PSP-07 cabe holgado
+
     function buildNoAChart(turbinas, catKey, containerId, desdeStr = '', hastaStr = '') {
       const el = document.getElementById(containerId);
       const subtitleEl = document.getElementById(containerId.replace('chart-', 'subtitle-'));
       if (!el) return;
 
       const filtered = turbinas.filter(t => t[catKey] !== 'A');
+      const svgId    = containerId + '-xlabels';
+      const legendId = containerId + '-legend';
 
-      // Limpiar badge strip y chart al vaciar
-      const badgeStripId = containerId + '-badges';
       const clearEmpty = (msg) => {
         Plotly.purge(containerId);
         el.innerHTML = `<div class="empty">${msg}</div>`;
         if (subtitleEl) subtitleEl.textContent = '';
-        const bs = document.getElementById(badgeStripId);
-        if (bs) bs.innerHTML = '';
+        const s = document.getElementById(svgId);    if (s) s.remove();
+        const l = document.getElementById(legendId); if (l) l.innerHTML = '';
+        // Limpiar badge strips de iteraciones anteriores
+        const sw = el.parentElement;
+        if (sw) sw.querySelectorAll('.wec-badge-strip').forEach(e => e.remove());
       };
 
       if (!filtered.length) return clearEmpty('Todas las turbinas en Cat. A');
 
-      // ── Rango de meses a mostrar (uniforme para todos los WECs) ──
-      // Warnings sin mes (histórico Peralta) no tienen posición en un eje
-      // mensual y se excluyen del gráfico.
+      // ── Rango de meses ────────────────────────────────────────
       const dataMonths = filtered.flatMap(t =>
         t.warnings.filter(w => w.mes != null).map(w => `${w.anio}-${String(w.mes).padStart(2, '0')}`)
       );
@@ -1142,37 +1145,38 @@
       }
       if (!monthKeys.length) return clearEmpty('Sin datos en el período seleccionado');
 
-      // ── Subtítulo ────────────────────────────────────────────
+      // ── Subtítulo de período ─────────────────────────────────
       const fmtP = str => { const [fy, fm] = str.split('-').map(Number); return `${MESES[fm]} ${fy}`; };
       let periodText = '';
       if (desdeStr && hastaStr && desdeStr === hastaStr) periodText = `Período: ${fmtP(desdeStr)}`;
-      else if (desdeStr && hastaStr)  periodText = `Período: ${fmtP(desdeStr)} – ${fmtP(hastaStr)}`;
-      else if (desdeStr)              periodText = `Desde ${fmtP(desdeStr)}`;
-      else if (hastaStr)              periodText = `Hasta ${fmtP(hastaStr)}`;
+      else if (desdeStr && hastaStr) periodText = `Período: ${fmtP(desdeStr)} – ${fmtP(hastaStr)}`;
+      else if (desdeStr)             periodText = `Desde ${fmtP(desdeStr)}`;
+      else if (hastaStr)             periodText = `Hasta ${fmtP(hastaStr)}`;
       if (subtitleEl) subtitleEl.textContent = periodText;
 
-      // Formatos de etiqueta
-      const outerLabel = key => {                               // eje outer: "Ene '26"
+      const longLabel = key => {
+        const [yr, mo] = key.split('-').map(Number); return `${MESES[mo]} ${yr}`;
+      };
+      const outerLabel = key => {
         const [yr, mo] = key.split('-').map(Number);
         return `${MESES[mo]} '${String(yr).slice(-2)}`;
       };
-      const longLabel = key => {                               // tooltip: "Ene 2026"
-        const [yr, mo] = key.split('-').map(Number);
-        return `${MESES[mo]} ${yr}`;
-      };
 
-      // ── Eje X multicategoría: mes (outer) × WEC (inner) ─────
-      // El mes es el grupo principal → el usuario lee el eje X como tiempo.
-      // Dentro de cada mes aparecen los WECs con categoría ≠ A.
+      const W = filtered.length;   // número de WECs
+      const M = monthKeys.length;  // número de meses
+
+      // ── Eje X: mes (outer) × WEC (inner) ─────────────────────
+      // Outer = mes visible como agrupador temporal; inner = código del WEC.
+      // Los tick labels del eje se OCULTAN — se dibujan en el SVG custom.
       const xMonth = [], xWec = [];
       for (const key of monthKeys) {
         for (const t of filtered) {
-          xMonth.push(outerLabel(key));    // outer (más abajo): "Ene '26"
-          xWec.push(t.turbina_codigo);     // inner (más arriba): "PSP-07"
+          xMonth.push(outerLabel(key));
+          xWec.push(t.turbina_codigo);
         }
       }
 
-      // ── Trazas: una por tipo de warning, apiladas ───────────
+      // ── Trazas ────────────────────────────────────────────────
       const tiposSet = [...new Set(filtered.flatMap(t => t.warnings.map(w => w.tipo)))].sort();
 
       const traces = tiposSet.map((tipo, ti) => {
@@ -1185,73 +1189,167 @@
               .filter(w => w.tipo === tipo && w.mes === mes && w.anio === anio)
               .reduce((s, w) => s + w.cantidad, 0);
             y.push(sum);
-            customdata.push([t.turbina_codigo, longLabel(key)]);
+            customdata.push([t.turbina_codigo, longLabel(key), t[catKey]]);
           }
         }
         return {
           x: [xMonth, xWec],
-          y,
-          customdata,
-          type: 'bar',
-          name: tipo,
+          y, customdata,
+          type: 'bar', name: tipo,
           marker: { color: TYPE_COLORS[ti % TYPE_COLORS.length] },
           hovertemplate:
-            `<b>%{customdata[0]}</b> · %{customdata[1]}<br>` +
+            `%{customdata[1]}<br>` +
+            `<b>%{customdata[0]}</b>  ·  Cat. %{customdata[2]}<br>` +
             `${tipo}: <b>%{y}</b><extra></extra>`,
         };
       });
 
-      // ── Ancho responsive con scroll interno ──────────────────
-      // 30px mínimo por barra (mes × WEC); el scroll vive en .chart-scroll-wrap
-      const MIN_PX_PER_BAR = 30;
+      // Líneas separadoras entre grupos de meses (en el área de barras)
+      const shapes = [];
+      for (let m = 1; m < M; m++) {
+        shapes.push({
+          type: 'line',
+          x0: m * W - 0.5, x1: m * W - 0.5,
+          y0: 0, y1: 1,
+          xref: 'x', yref: 'paper',
+          line: { color: '#2e3b55', width: 2 },
+        });
+      }
+
+      // ── Ancho ─────────────────────────────────────────────────
       const scrollWrap = el.parentElement;
       const boxW = (scrollWrap?.parentElement?.clientWidth || 660) - 32;
-      const chartW = Math.max(boxW, monthKeys.length * filtered.length * MIN_PX_PER_BAR + 60);
+      const chartW = Math.max(boxW, W * M * _MIN_BAR_PX + 60);
 
-      // ── Layout ───────────────────────────────────────────────
-      // Sin anotaciones de badge (se renderizan como HTML debajo del chart).
-      // b:90 alcanza para dos niveles de etiq. de eje + leyenda horizontal.
-      const base = plotlyLayout({ margin: { t: 4, r: 16, b: 90, l: 44 } });
+      // ── Layout Plotly — sin leyenda, sin tick labels ──────────
+      // La leyenda se renderiza como HTML; los labels del eje, en SVG custom.
+      const base = plotlyLayout({ margin: { t: 4, r: 16, b: 4, l: 44 } });
       const layout = {
         ...base,
         width: chartW,
-        height: 280,
-        xaxis: {
-          ...base.xaxis,
-          tickangle: 0,
-          automargin: false,
-        },
+        height: _CHART_H,
+        xaxis: { ...base.xaxis, showticklabels: false, automargin: false },
         barmode: 'stack',
-        showlegend: tiposSet.length > 0,
-        legend: {
-          bgcolor: 'transparent', bordercolor: 'transparent',
-          font: { size: 10, color: '#dde3f0' },
-          orientation: 'h', y: -0.48, x: 0,
-        },
+        showlegend: false,
+        shapes,
       };
 
-      Plotly.react(containerId, traces, layout, { responsive: false, displayModeBar: false });
+      // Después del render, calcular posiciones reales y dibujar SVG
+      Plotly.react(containerId, traces, layout, { responsive: false, displayModeBar: false })
+        .then(() => {
+          _renderNoALabels(containerId, filtered, monthKeys, catKey, chartW, svgId, scrollWrap);
+        });
 
-      // ── Badge strip HTML ──────────────────────────────────────
-      // Renderizado fuera del scroll wrapper para que no se desplace,
-      // y fuera del div de Plotly para que react() no lo borre.
-      // Posición: dentro del .chart-box, después del .chart-scroll-wrap.
+      // ── Leyenda HTML (fuera del scroll, siempre visible) ──────
       const chartBox = scrollWrap?.parentElement;
-      let badgeStrip = document.getElementById(badgeStripId);
-      if (!badgeStrip) {
-        badgeStrip = document.createElement('div');
-        badgeStrip.id = badgeStripId;
-        badgeStrip.className = 'wec-badge-strip';
-        if (chartBox) chartBox.appendChild(badgeStrip);
+      let legendEl = document.getElementById(legendId);
+      if (!legendEl) {
+        legendEl = document.createElement('div');
+        legendEl.id = legendId;
+        legendEl.className = 'chart-html-legend';
+        if (chartBox) chartBox.appendChild(legendEl);
       }
-      badgeStrip.innerHTML = filtered.map(t => {
-        const cat   = t[catKey];
-        const color = CAT_COLORS[cat] || CAT_COLORS.ND;
-        return `<span class="wec-badge-item">
-          <span>${t.turbina_codigo}</span>
-          <span class="wec-badge-pill" style="color:${color};border-color:${color};background:${color}28">${cat}</span>
+      legendEl.innerHTML = tiposSet.map((tipo, ti) => {
+        const color = TYPE_COLORS[ti % TYPE_COLORS.length];
+        return `<span class="legend-item">
+          <span class="legend-dot" style="background:${color}"></span>${tipo}
         </span>`;
       }).join('');
+
+      // Limpiar badge strips residuales si quedaron de versiones anteriores
+      if (chartBox) chartBox.querySelectorAll('.wec-badge-strip').forEach(e => e.remove());
+    }
+
+    function _renderNoALabels(containerId, filtered, monthKeys, catKey, chartW, svgId, scrollWrap) {
+      const gd = document.getElementById(containerId);
+      if (!gd || !gd._fullLayout || !gd._fullLayout.xaxis) return;
+
+      const xaxis  = gd._fullLayout.xaxis;
+      const plotL  = gd._fullLayout._size.l;   // margen izquierdo en px
+      const plotW  = gd._fullLayout._size.w;   // ancho del área de plot
+      const xRange = xaxis.range;              // [-0.5, N-0.5] para N barras
+      if (!xRange || xRange[1] === xRange[0]) return;
+
+      const W = filtered.length;
+      const M = monthKeys.length;
+
+      // Convierte índice de barra (0-based) a coordenada px en el SVG total
+      const barPx = i => plotL + (i - xRange[0]) / (xRange[1] - xRange[0]) * plotW;
+
+      // ── Crear o reusar el SVG ─────────────────────────────────
+      const ns = 'http://www.w3.org/2000/svg';
+      let svg = document.getElementById(svgId);
+      if (!svg) {
+        svg = document.createElementNS(ns, 'svg');
+        svg.id = svgId;
+        svg.style.display      = 'block';
+        svg.style.overflow     = 'visible';
+        svg.style.pointerEvents = 'none';
+        if (scrollWrap) scrollWrap.appendChild(svg);
+      }
+      svg.style.width  = chartW + 'px';
+      svg.style.height = _LABEL_H  + 'px';
+      svg.innerHTML    = '';
+
+      // Helper: crear elemento <text>
+      const mkTxt = (x, y, txt, opts = {}) => {
+        const t = document.createElementNS(ns, 'text');
+        t.setAttribute('x', x); t.setAttribute('y', y);
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('dominant-baseline', 'central');
+        t.setAttribute('fill',        opts.fill      || '#aab4cc');
+        t.setAttribute('font-size',   opts.size      || '10');
+        t.setAttribute('font-family', opts.family    || 'Inter, sans-serif');
+        if (opts.weight) t.setAttribute('font-weight', opts.weight);
+        t.textContent = txt;
+        return t;
+      };
+
+      // ── Por barra: código WEC y badge de categoría ───────────
+      for (let m = 0; m < M; m++) {
+        for (let w = 0; w < W; w++) {
+          const t     = filtered[w];
+          const cat   = t[catKey];
+          const color = CAT_COLORS[cat] || CAT_COLORS.ND;
+          const cx    = barPx(m * W + w);
+
+          // Código WEC (ej. "PSP-07")
+          svg.appendChild(mkTxt(cx, 14, t.turbina_codigo, { fill: '#aab4cc', size: '10' }));
+
+          // Badge: rect coloreado + letra de categoría
+          const BW = 22, BH = 15;
+          const rect = document.createElementNS(ns, 'rect');
+          rect.setAttribute('x', cx - BW / 2); rect.setAttribute('y', 24);
+          rect.setAttribute('width', BW);       rect.setAttribute('height', BH);
+          rect.setAttribute('rx', 7);
+          rect.setAttribute('fill', color + '28');
+          rect.setAttribute('stroke', color); rect.setAttribute('stroke-width', '1.5');
+          svg.appendChild(rect);
+
+          svg.appendChild(mkTxt(cx, 31.5, cat, {
+            fill: color, size: '9.5', family: 'Space Grotesk, sans-serif', weight: '700',
+          }));
+        }
+
+        // ── Etiqueta del mes (centrada bajo el grupo) ─────────
+        const gLeft  = barPx(m * W);
+        const gRight = barPx(m * W + W - 1);
+        const gcx    = (gLeft + gRight) / 2;
+        const [yr, mo] = monthKeys[m].split('-').map(Number);
+        svg.appendChild(mkTxt(gcx, 62, `${MESES[mo]} '${String(yr).slice(-2)}`, {
+          fill: '#7b869c', size: '11', family: 'Space Grotesk, sans-serif', weight: '600',
+        }));
+
+        // ── Línea separadora entre meses (en el SVG de etiquetas) ──
+        if (m < M - 1) {
+          const sepX = (barPx(m * W + W - 1) + barPx((m + 1) * W)) / 2;
+          const line = document.createElementNS(ns, 'line');
+          line.setAttribute('x1', sepX); line.setAttribute('y1', 0);
+          line.setAttribute('x2', sepX); line.setAttribute('y2', _LABEL_H);
+          line.setAttribute('stroke', '#2e3b55'); line.setAttribute('stroke-width', '2');
+          svg.appendChild(line);
+        }
+      }
     }
 
     // ── MAPA ESTADO ───────────────────────────────────────────
