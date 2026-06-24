@@ -1082,7 +1082,6 @@
 
       const filtered = turbinas.filter(t => t[catKey] !== 'A');
 
-      // Limpiar subtítulo si no hay datos
       const clearEmpty = (msg) => {
         Plotly.purge(containerId);
         el.innerHTML = `<div class="empty">${msg}</div>`;
@@ -1091,64 +1090,66 @@
 
       if (!filtered.length) return clearEmpty('Todas las turbinas en Cat. A');
 
-      // ── Filtro de rango ──────────────────────────────────────
-      const [desdeAnio, desMes] = desdeStr ? desdeStr.split('-').map(Number) : [null, null];
-      const [hastaAnio, hasMes] = hastaStr ? hastaStr.split('-').map(Number) : [null, null];
-      function enRango(mes, anio) {
-        if (mes == null) return true;
-        if (desdeAnio && (anio < desdeAnio || (anio === desdeAnio && mes < desMes))) return false;
-        if (hastaAnio && (anio > hastaAnio || (anio === hastaAnio && mes > hasMes))) return false;
-        return true;
-      }
+      // ── Rango de meses a mostrar (uniforme para todos los WECs) ──
+      // Los warnings sin mes (histórico Peralta) no tienen posición en el eje
+      // mensual, por lo que se excluyen del gráfico mensual.
+      const dataMonths = filtered.flatMap(t =>
+        t.warnings.filter(w => w.mes != null).map(w => `${w.anio}-${String(w.mes).padStart(2, '0')}`)
+      );
+      const minKey = desdeStr || (dataMonths.length ? [...dataMonths].sort()[0]     : null);
+      const maxKey = hastaStr || (dataMonths.length ? [...dataMonths].sort().at(-1) : null);
 
-      // ── Subtítulo de período ─────────────────────────────────
+      let monthKeys = [];
+      if (minKey && maxKey) {
+        let [y, m] = minKey.split('-').map(Number);
+        const [maxY, maxM] = maxKey.split('-').map(Number);
+        while (y < maxY || (y === maxY && m <= maxM)) {
+          monthKeys.push(`${y}-${String(m).padStart(2, '0')}`);
+          m++; if (m > 12) { m = 1; y++; }
+        }
+      }
+      if (!monthKeys.length) return clearEmpty('Sin datos en el período seleccionado');
+
+      // ── Subtítulo ────────────────────────────────────────────
       const fmtP = str => { const [y, m] = str.split('-').map(Number); return `${MESES[m]} ${y}`; };
       let periodText = '';
       if (desdeStr && hastaStr && desdeStr === hastaStr) periodText = `Período: ${fmtP(desdeStr)}`;
-      else if (desdeStr && hastaStr)                    periodText = `Período: ${fmtP(desdeStr)} – ${fmtP(hastaStr)}`;
-      else if (desdeStr)                                periodText = `Desde ${fmtP(desdeStr)}`;
-      else if (hastaStr)                                periodText = `Hasta ${fmtP(hastaStr)}`;
+      else if (desdeStr && hastaStr)  periodText = `Período: ${fmtP(desdeStr)} – ${fmtP(hastaStr)}`;
+      else if (desdeStr)              periodText = `Desde ${fmtP(desdeStr)}`;
+      else if (hastaStr)              periodText = `Hasta ${fmtP(hastaStr)}`;
       if (subtitleEl) subtitleEl.textContent = periodText;
 
-      // ── Agregar warnings por (WEC, tipo) en el período ──────
-      // Una sola barra por WEC, apilada por tipo. No hay eje de meses.
-      const tiposSet = new Set();
-      const agg = {}; // agg[tipo][wecCodigo] = total
+      // Etiqueta corta para el eje inner: "Ene'25"
+      const shortLabel = key => {
+        const [yr, mo] = key.split('-').map(Number);
+        return `${MESES[mo]}'${String(yr).slice(-2)}`;
+      };
+      // Etiqueta larga para el tooltip: "Enero 2025"
+      const longLabel = key => {
+        const [yr, mo] = key.split('-').map(Number);
+        return `${MESES[mo]} ${yr}`;
+      };
+
+      // ── Eje X multicategoría: WEC (outer) × mes (inner) ─────
+      // Cada WEC muestra exactamente los mismos meses → sin superposición
+      const xWec = [], xMes = [];
+      const annotations = [];
+      let xPos = 0;
+
       for (const t of filtered) {
-        for (const w of t.warnings) {
-          if (!enRango(w.mes, w.anio)) continue;
-          tiposSet.add(w.tipo);
-          if (!agg[w.tipo]) agg[w.tipo] = {};
-          agg[w.tipo][t.turbina_codigo] = (agg[w.tipo][t.turbina_codigo] || 0) + w.cantidad;
+        for (const key of monthKeys) {
+          xWec.push(t.turbina_codigo);
+          xMes.push(shortLabel(key));
         }
-      }
 
-      const tipos   = [...tiposSet].sort();
-      const wecCodes = filtered.map(t => t.turbina_codigo);
-
-      if (!tipos.length) return clearEmpty('Sin datos en el período seleccionado');
-
-      // ── Trazas: una por tipo, x = WEC codes ─────────────────
-      const colorMap = {};
-      tipos.forEach((tp, i) => { colorMap[tp] = TYPE_COLORS[i % TYPE_COLORS.length]; });
-
-      const tipoPeriod = periodText ? `<br><span style="color:#7b869c;font-size:10px">${periodText}</span>` : '';
-      const traces = tipos.map(tipo => ({
-        x: wecCodes,
-        y: wecCodes.map(code => agg[tipo]?.[code] || 0),
-        type: 'bar',
-        name: tipo,
-        marker: { color: colorMap[tipo] },
-        hovertemplate: `<b>%{x}</b><br>${tipo}: <b>%{y}</b>${tipoPeriod}<extra></extra>`,
-      }));
-
-      // ── Badges de categoría como annotations ─────────────────
-      // xref:'x' con string = código del WEC (más robusto que índice numérico)
-      const annotations = filtered.map(t => {
+        // Badge centrado bajo el grupo del WEC.
+        // Con multicategoría hay dos niveles de etiquetas (mes outer, WEC inner
+        // en Plotly el outer es el más bajo). y:-0.35 queda debajo de ambos.
+        const center = xPos + (monthKeys.length - 1) / 2;
         const catColor = CAT_COLORS[t[catKey]] || CAT_COLORS.ND;
-        return {
-          x: t.turbina_codigo,
-          y: -0.22,
+        annotations.push({
+          x: center,
+          y: -0.35,
           xref: 'x',
           yref: 'paper',
           text: `<b>${t[catKey]}</b>`,
@@ -1158,28 +1159,68 @@
           borderwidth: 1.5,
           borderpad: 5,
           font: { size: 11, color: catColor },
+        });
+        xPos += monthKeys.length;
+      }
+
+      // ── Trazas: una por tipo, apiladas por WEC×mes ───────────
+      const tiposSet = [...new Set(filtered.flatMap(t => t.warnings.map(w => w.tipo)))].sort();
+      const colorMap = {};
+      tiposSet.forEach((tp, i) => { colorMap[tp] = TYPE_COLORS[i % TYPE_COLORS.length]; });
+
+      const traces = tiposSet.map(tipo => {
+        const y = [], customdata = [];
+        for (const t of filtered) {
+          for (const key of monthKeys) {
+            const mes  = parseInt(key.split('-')[1]);
+            const anio = parseInt(key.split('-')[0]);
+            const sum  = t.warnings
+              .filter(w => w.tipo === tipo && w.mes === mes && w.anio === anio)
+              .reduce((s, w) => s + w.cantidad, 0);
+            y.push(sum);
+            customdata.push([t.turbina_codigo, longLabel(key)]);
+          }
+        }
+        return {
+          x: [xWec, xMes],
+          y,
+          customdata,
+          type: 'bar',
+          name: tipo,
+          marker: { color: colorMap[tipo] },
+          hovertemplate:
+            `<b>%{customdata[0]}</b> · %{customdata[1]}<br>` +
+            `${tipo}: <b>%{y}</b><extra></extra>`,
         };
       });
 
-      // ── Ancho: scroll interno si hay muchos WECs ─────────────
-      const MIN_PX_PER_WEC = 80;
+      // ── Ancho responsive con scroll interno ──────────────────
+      // Mínimo 26 px por barra (WEC × mes); el scroll está en .chart-scroll-wrap
+      const MIN_PX_PER_BAR = 26;
       const scrollWrap = el.parentElement;
       const boxW = (scrollWrap?.parentElement?.clientWidth || 660) - 32;
-      const chartW = Math.max(boxW, wecCodes.length * MIN_PX_PER_WEC + 60);
+      const chartW = Math.max(boxW, filtered.length * monthKeys.length * MIN_PX_PER_BAR + 60);
 
       // ── Layout ───────────────────────────────────────────────
-      const base = plotlyLayout({ margin: { t: 4, r: 16, b: 115, l: 44 } });
+      // b:140 da espacio para: etiq. mes (~20px) + etiq. WEC (~20px) +
+      // badge (~14px) + separación + leyenda (~30px) = ~84px → cabe en 140.
+      const base = plotlyLayout({ margin: { t: 4, r: 16, b: 140, l: 44 } });
       const layout = {
         ...base,
         width: chartW,
         height: 300,
-        xaxis: { ...base.xaxis, tickangle: 0, automargin: true },
+        xaxis: {
+          ...base.xaxis,
+          // Rotar etiquetas de mes solo cuando hay muchos meses para evitar solapamiento
+          tickangle: monthKeys.length > 5 ? -30 : 0,
+          automargin: false,
+        },
         barmode: 'stack',
-        showlegend: tipos.length > 0,
+        showlegend: tiposSet.length > 0,
         legend: {
           bgcolor: 'transparent', bordercolor: 'transparent',
           font: { size: 10, color: '#dde3f0' },
-          orientation: 'h', y: -0.55, x: 0,
+          orientation: 'h', y: -0.63, x: 0,
         },
         annotations,
       };
