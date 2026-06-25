@@ -337,6 +337,13 @@
         if (total > 0) {
           const ty = n > 8 ? ly + 9 : ly + 12;
           o += `<text x="${lx}" y="${ty}" text-anchor="middle" font-size="9" fill="#BFBFBF">${total}</text>`;
+        } else {
+          // Mes con 0 warnings: guión horizontal en la línea base + texto "0"
+          const dashW = Math.round(barW * 0.55);
+          const baseY = padT + plotH;
+          o += `<line x1="${lx - dashW/2}" y1="${baseY}" x2="${lx + dashW/2}" y2="${baseY}" stroke="#3a4a5e" stroke-width="2.5" stroke-linecap="round"/>`;
+          const ty = n > 8 ? ly + 9 : ly + 12;
+          o += `<text x="${lx}" y="${ty}" text-anchor="middle" font-size="9" fill="#3a4a5e">0</text>`;
         }
       });
 
