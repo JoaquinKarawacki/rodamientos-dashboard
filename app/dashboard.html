@@ -1586,7 +1586,7 @@
         }];
       }
 
-      // Total below each bar
+      // Total below each bar (only non-zero months)
       const totAnnotations = mesFiltrado
         .filter(m => m.cantidad > 0)
         .map(m => ({
@@ -1596,6 +1596,37 @@
           showarrow: false,
           font: { color: '#7b869c', size: 10, family: 'Space Grotesk, sans-serif' },
         }));
+
+      // Indicador visual para meses con 0 warnings:
+      // • traza scatter con marcador horizontal en y=0 (valor real = 0, no altera escala)
+      // • anotación de texto "0" debajo del marcador (mismo estilo que totAnnotations)
+      const zeroMeses = mesFiltrado.filter(m => m.cantidad === 0);
+      if (zeroMeses.length > 0) {
+        traces.push({
+          x: zeroMeses.map(m => mesLabel(m.mes, m.anio)),
+          y: zeroMeses.map(() => 0),
+          type: 'scatter',
+          mode: 'markers',
+          marker: {
+            symbol: 'line-ew-open',
+            size: 20,
+            line: { color: '#3a4a5e', width: 2.5 },
+          },
+          showlegend: false,
+          name: '',
+          hovertemplate:
+            '<b>%{x}</b><br>' +
+            'Total de warnings: 0<br>' +
+            'Sin warnings registrados<extra></extra>',
+        });
+      }
+      const zeroAnnotations = zeroMeses.map(m => ({
+        x: mesLabel(m.mes, m.anio),
+        y: 0, yref: 'y', yanchor: 'top', yshift: -14,
+        text: '0',
+        showarrow: false,
+        font: { color: '#3a4a5e', size: 10, family: 'Space Grotesk, sans-serif' },
+      }));
 
       // Vertical dashed lines for inspection events
       const shapes = [];
@@ -1622,7 +1653,7 @@
         ...plotlyLayout({ margin: { t: 8, r: 12, b: 56, l: 40 } }),
         barmode: 'stack',
         shapes,
-        annotations: [...totAnnotations, ...inspAnnotations],
+        annotations: [...totAnnotations, ...zeroAnnotations, ...inspAnnotations],
         showlegend: tiposSet.length > 1,
         legend: {
           bgcolor: 'transparent', bordercolor: 'transparent',
