@@ -87,6 +87,36 @@ def exportar_dashboard(codigo_parque: str, sesion: Session = Depends(obtener_ses
         key = (w.mes, w.anio)
         warn_mes_global[key] = warn_mes_global.get(key, 0) + w.cantidad
 
+    # warnings_detalle_turbinas: una entrada por turbina con categorías y warnings
+    # (misma estructura que devuelve GET /resumen/{codigo})
+    turbina_por_id     = {t.id: t for t in turbinas}
+    ultima_por_turbina = {
+        insp_list[0].turbina_id: insp_list[0]
+        for insp_list in insp_idx.values() if insp_list
+    }
+    detalle: dict = {}
+    for w in all_warn_tipo:
+        tid = w.turbina_id
+        if tid not in detalle:
+            t    = turbina_por_id.get(tid)
+            insp = ultima_por_turbina.get(tid)
+            if not t:
+                continue
+            detalle[tid] = {
+                "turbina_codigo":      t.codigo,
+                "turbina_id":          tid,
+                "categoria_delantera": insp.categoria_delantera if insp else "ND",
+                "categoria_trasera":   insp.categoria_trasera   if insp else "ND",
+                "warnings": [],
+            }
+        detalle[tid]["warnings"].append({
+            "tipo":     w.tipo,
+            "cantidad": w.cantidad,
+            "mes":      w.mes,
+            "anio":     w.anio,
+        })
+    warnings_detalle_turbinas = sorted(detalle.values(), key=lambda x: x["turbina_codigo"])
+
     data = {
         "parque": {
             "id": parque.id,
@@ -108,6 +138,7 @@ def exportar_dashboard(codigo_parque: str, sesion: Session = Depends(obtener_ses
                 {"tipo": w.tipo, "cantidad": w.cantidad, "mes": w.mes, "anio": w.anio}
                 for w in all_warn_tipo
             ],
+            "warnings_detalle_turbinas": warnings_detalle_turbinas,
         },
         "generado": datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC"),
     }
