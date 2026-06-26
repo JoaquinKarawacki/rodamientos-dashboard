@@ -9,10 +9,6 @@ from app.repositorios.repositorio_warning_por_tipo import RepositorioWarningPorT
 from app.etl.parser_rodamientos import parsear_estado_rodamientos, parsear_nuevo_control
 from app.etl.parser_logbook import parsear_logbook
 from app.etl.agregador_warnings import agregar_por_mes, agregar_por_tipo
-from app.etl.parser_warnings_peralta import (
-    parsear_warnings_mensuales,
-    parsear_warnings_por_tipo,
-)
 
 
 class ServicioCarga:
@@ -122,29 +118,6 @@ class ServicioCarga:
         except Exception as error:
             self.sesion.rollback()
             raise RuntimeError(f"Error al cargar logbook: {error}") from error
-
-    def cargar_seed_warnings_peralta(self, ruta: str, nombre_archivo: str) -> dict:
-        """
-        Carga inicial SOLO de Peralta: las dos hojas pre-agregadas
-        (Warnings_Mensuales + Warnings_por_Tipo). Corre una vez.
-        """
-        try:
-            parque = self._obtener_parque("PSP")
-            carga  = self.repo_carga.crear(parque.id, "seed_warnings", nombre_archivo)
-
-            ins_mes  = self._guardar_conteos(parsear_warnings_mensuales(ruta), parque.id, carga.id, self.repo_warn_mes,  "mes")
-            ins_tipo = self._guardar_conteos(parsear_warnings_por_tipo(ruta),  parque.id, carga.id, self.repo_warn_tipo, "tipo")
-
-            carga.estado               = "exitosa"
-            carga.registros_insertados = ins_mes + ins_tipo
-            self.sesion.commit()
-            return {
-                "estado": "exitosa", "carga_id": carga.id,
-                "conteos_por_mes": ins_mes, "conteos_por_tipo": ins_tipo,
-            }
-        except Exception as error:
-            self.sesion.rollback()
-            raise RuntimeError(f"Error en seed de warnings Peralta: {error}") from error
 
     def _guardar_conteos(self, conteos: list[dict], parque_id: int, carga_id: int, repo, etiqueta: str) -> int:
         """Inserta una lista de conteos usando el repo correspondiente."""

@@ -10,7 +10,7 @@ from app.servicios.servicio_carga import ServicioCarga
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-TIPOS_VALIDOS = ["seed_rodamientos", "control_mensual", "logbook", "seed_warnings"]
+TIPOS_VALIDOS = ["seed_rodamientos", "control_mensual", "logbook"]
 
 @router.get("/cargas/{codigo_parque}")
 def listar_cargas(codigo_parque: str, sesion: Session = Depends(obtener_sesion)):
@@ -39,8 +39,6 @@ async def cargar_archivo(
 ):
     if tipo_carga not in TIPOS_VALIDOS:
         raise HTTPException(status_code=400, detail=f"tipo_carga debe ser uno de: {TIPOS_VALIDOS}")
-    if tipo_carga == "seed_warnings" and codigo_parque.upper() != "PSP":
-        raise HTTPException(status_code=400, detail="seed_warnings solo aplica al parque PSP")
 
     suffix = os.path.splitext(archivo.filename)[1] or ".xlsx"
     tmp_path = None
@@ -59,8 +57,6 @@ async def cargar_archivo(
             resultado = servicio.cargar_control_mensual(tmp_path, codigo, nombre)
         elif tipo_carga == "logbook":
             resultado = servicio.cargar_logbook(tmp_path, codigo, nombre)
-        elif tipo_carga == "seed_warnings":
-            resultado = servicio.cargar_seed_warnings_peralta(tmp_path, nombre)
 
         return resultado
     except RuntimeError as e:

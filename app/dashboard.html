@@ -793,7 +793,6 @@
               <option value="control_mensual">Control mensual (hoja X)</option>
               <option value="logbook">Logbook ROTORsoft</option>
               <option value="seed_rodamientos">Seed rodamientos (primera vez)</option>
-              <option value="seed_warnings">Seed warnings Peralta (primera vez)</option>
             </select>
           </div>
 
@@ -1742,14 +1741,6 @@
     // ── ADMIN ─────────────────────────────────────────────────
 
     function onTipoCambio() {
-      const tipo = document.getElementById('admin-tipo').value;
-      const selectParque = document.getElementById('admin-parque');
-      if (tipo === 'seed_warnings') {
-        selectParque.value = 'PSP';
-        selectParque.disabled = true;
-      } else {
-        selectParque.disabled = false;
-      }
     }
 
     async function loadAdmin() {
