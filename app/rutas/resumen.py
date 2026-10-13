@@ -51,6 +51,7 @@ def resumen(codigo_parque: str, sesion: Session = Depends(obtener_sesion)):
                 continue
             detalle[tid] = {
                 "turbina_codigo":      t.codigo,
+                "turbina_etiqueta":    t.etiqueta,
                 "turbina_id":          tid,
                 "categoria_delantera": insp.categoria_delantera if insp else "ND",
                 "categoria_trasera":   insp.categoria_trasera   if insp else "ND",

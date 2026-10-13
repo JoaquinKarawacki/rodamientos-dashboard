@@ -25,6 +25,7 @@ def mapa_estado(codigo_parque: str, sesion: Session = Depends(obtener_sesion)):
         resultado.append({
             "id": t.id,
             "codigo": t.codigo,
+            "etiqueta": t.etiqueta,
             "numero": t.numero,
             "ultima_inspeccion": {
                 "fecha": str(insp.fecha),

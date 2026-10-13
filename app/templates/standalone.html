@@ -406,7 +406,7 @@
       const data = filtered.map(t => {
         const totals = {};
         for (const w of t.warnings) totals[w.tipo] = (totals[w.tipo] || 0) + w.cantidad;
-        return { codigo: t.turbina_codigo, cat: t[catKey], totals };
+        return { codigo: t.turbina_etiqueta || t.turbina_codigo, cat: t[catKey], totals };
       });
 
       const maxTotal = Math.max(1, ...data.map(d => Object.values(d.totals).reduce((s, v) => s + v, 0)));
@@ -502,7 +502,7 @@
         const del  = insp?.categoria_delantera || 'ND';
         const tras = insp?.categoria_trasera   || 'ND';
         return `<div class="turbina-card" onclick="goToTurbina(${t.id})">
-          <div class="t-code">${t.codigo}</div>
+          <div class="t-code">${t.etiqueta || t.codigo}</div>
           <div class="t-badges">
             <div class="t-badge">
               <div class="t-dot ${dotClass(del)}">${del}</div>
@@ -528,7 +528,7 @@
         const worst = worstCat(del, tras);
         const color = CAT_COLORS[worst] || CAT_COLORS.ND;
         return `<div class="sidebar-item" id="sidebar-${t.id}" onclick="renderTurbinaDetail(${t.id})">
-          <span>${t.codigo}</span>
+          <span>${t.etiqueta || t.codigo}</span>
           <div class="sidebar-dot" style="background:${color}18;color:${color};border:1px solid ${color}40">${worst}</div>
         </div>`;
       }).join('');
@@ -559,7 +559,7 @@
 
       document.getElementById('turbina-detail').innerHTML = `
         <div class="t-status-header">
-          <div class="t-status-name">${t.codigo}</div>
+          <div class="t-status-name">${t.etiqueta || t.codigo}</div>
           <span class="t-warn-total">${totalWarnings} warnings</span>
           ${ultima ? `
             <div class="t-status-badge">Del <strong class="${catClass(ultima.categoria_delantera)}">${ultima.categoria_delantera}</strong></div>

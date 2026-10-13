@@ -1171,7 +1171,7 @@
       for (const key of monthKeys) {
         for (const t of filtered) {
           xMonth.push(outerLabel(key));
-          xWec.push(t.turbina_codigo);
+          xWec.push(t.turbina_etiqueta || t.turbina_codigo);
         }
       }
 
@@ -1188,7 +1188,7 @@
               .filter(w => w.tipo === tipo && w.mes === mes && w.anio === anio)
               .reduce((s, w) => s + w.cantidad, 0);
             y.push(sum);
-            customdata.push([t.turbina_codigo, longLabel(key), t[catKey]]);
+            customdata.push([t.turbina_etiqueta || t.turbina_codigo, longLabel(key), t[catKey]]);
           }
         }
         return {
@@ -1312,8 +1312,8 @@
           const color = CAT_COLORS[cat] || CAT_COLORS.ND;
           const cx    = barPx(m * W + w);
 
-          // Código WEC (ej. "PSP-07")
-          svg.appendChild(mkTxt(cx, 14, t.turbina_codigo, { fill: '#aab4cc', size: '10' }));
+          // Nombre de la turbina (etiqueta marca+serie en PSP; código en CG)
+          svg.appendChild(mkTxt(cx, 14, t.turbina_etiqueta || t.turbina_codigo, { fill: '#aab4cc', size: '10' }));
 
           // Badge: rect coloreado + letra de categoría
           const BW = 22, BH = 15;
@@ -1366,7 +1366,7 @@
         const tras = insp?.categoria_trasera || 'ND';
         return `
           <div class="turbina-card" onclick="selectTurbina(${t.id}, '${t.codigo}')">
-            <div class="t-code">${t.codigo}</div>
+            <div class="t-code">${t.etiqueta || t.codigo}</div>
             <div class="t-badges">
               <div class="t-badge">
                 <div class="t-dot ${dotClass(del)}">${del}</div>
@@ -1402,7 +1402,7 @@
         return `
           <div class="sidebar-item" id="sidebar-${t.id}"
                onclick="selectTurbina(${t.id}, '${t.codigo}')">
-            <span>${t.codigo}</span>
+            <span>${t.etiqueta || t.codigo}</span>
             <div class="sidebar-dot ${dotClass(worst)}"
                  style="background:${color}20; color:${color}; border:1px solid ${color}50">
               ${worst}
@@ -1476,7 +1476,7 @@
 
       detail.innerHTML = `
         <div class="t-status-header">
-          <div class="t-status-name">${turbina.codigo}</div>
+          <div class="t-status-name">${turbina.etiqueta || turbina.codigo}</div>
           <span class="t-warn-total">${totalWarnings} warnings</span>
           ${ultima ? `
             <div class="t-status-badge">

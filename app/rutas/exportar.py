@@ -47,6 +47,7 @@ def exportar_dashboard(codigo_parque: str, sesion: Session = Depends(obtener_ses
         turbinas_data.append({
             "id": t.id,
             "codigo": t.codigo,
+            "etiqueta": t.etiqueta,
             "numero": t.numero,
             "ultima_inspeccion": {
                 "fecha": str(ultima.fecha),
@@ -104,6 +105,7 @@ def exportar_dashboard(codigo_parque: str, sesion: Session = Depends(obtener_ses
                 continue
             detalle[tid] = {
                 "turbina_codigo":      t.codigo,
+                "turbina_etiqueta":    t.etiqueta,
                 "turbina_id":          tid,
                 "categoria_delantera": insp.categoria_delantera if insp else "ND",
                 "categoria_trasera":   insp.categoria_trasera   if insp else "ND",

@@ -22,6 +22,7 @@ def detalle_turbina(turbina_id: int, sesion: Session = Depends(obtener_sesion)):
         "turbina": {
             "id": turbina.id,
             "codigo": turbina.codigo,
+            "etiqueta": turbina.etiqueta,
             "numero": turbina.numero,
             "parque_id": turbina.parque_id,
         },

@@ -8,8 +8,9 @@ class Turbina(Base):
 
     id        = Column(Integer, primary_key=True)
     parque_id = Column(Integer, ForeignKey("parques.id"), nullable=False)
-    codigo    = Column(String(20), nullable=False)   # "WEC01", "PSP-01"
+    codigo    = Column(String(20), nullable=False)   # "WEC01", "PSP-01" — clave de cruce ETL, NO cambiar
     numero    = Column(Integer, nullable=False)       # 1, 2, ... 22 ó 50
+    etiqueta  = Column(String(100), nullable=True)    # nombre visible (marca+serie), solo PSP; NULL = usar codigo
     activa    = Column(Boolean, default=True)
 
     parque         = relationship("Parque",  back_populates="turbinas")
